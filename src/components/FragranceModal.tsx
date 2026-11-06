@@ -20,6 +20,7 @@ import { getCustomizedFragrance, saveAdminFragranceUpdate } from '../services/ca
 import { compressImage } from '../utils/imageCompressor';
 import { AdminFragranceEditorModal } from './AdminFragranceEditorModal';
 import { AdminNotePhotoEditorModal } from './AdminNotePhotoEditorModal';
+import { GoogleImageUploadModal } from './GoogleImageUploadModal';
 import {
   X,
   Heart,
@@ -71,6 +72,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
   const [editImage, setEditImage] = useState<string>('');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isGooglePhotoModalOpen, setIsGooglePhotoModalOpen] = useState<boolean>(false);
   const photoUploadInputRef = useRef<HTMLInputElement>(null);
 
   // Global single theme synced with laptop / phone and header toggle
@@ -140,6 +142,26 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
     } finally {
       setIsSaving(false);
       if (photoUploadInputRef.current) photoUploadInputRef.current.value = '';
+    }
+  };
+
+  const handleGooglePhotoSelected = async (newUrl: string) => {
+    if (!currentFragrance) return;
+    setIsSaving(true);
+    setSaveStatus('Optimizando y guardando foto del perfume...');
+    try {
+      const compressed = await compressImage(newUrl, 600, 600, 0.85);
+      const finalUrl = compressed || newUrl;
+      setEditImage(finalUrl);
+      await saveAdminFragranceUpdate(currentFragrance.code, { image: finalUrl });
+      setCurrentFragrance({ ...currentFragrance, image: finalUrl });
+      setSaveStatus('¡Foto del frasco guardada con éxito en la base de datos!');
+      setTimeout(() => setSaveStatus(null), 3500);
+    } catch {
+      setSaveStatus('Error al procesar la foto.');
+      setTimeout(() => setSaveStatus(null), 3500);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -463,12 +485,13 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                       />
                       <button
                         type="button"
-                        onClick={() => photoUploadInputRef.current?.click()}
+                        onClick={() => setIsGooglePhotoModalOpen(true)}
                         disabled={isSaving}
                         className="px-3 py-2 rounded-xl bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 border border-amber-400/40 text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        title="Arrastrar imagen desde Google, escritorio o pegar con Ctrl+V"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        <span>Subir Foto</span>
+                        <span>Arrastrar / Pegar (Google Lens)</span>
                       </button>
                     </div>
                   </div>
@@ -519,11 +542,17 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
               {/* Left: Real Bottle Photo & Code */}
               <div className="md:col-span-5 space-y-3">
                 <div
+                  onClick={() => {
+                    if (isAdmin) setIsGooglePhotoModalOpen(true);
+                  }}
                   className={`relative w-full aspect-[3/4] max-w-xs mx-auto rounded-3xl overflow-hidden border p-4 flex items-center justify-center group transition-colors ${
+                    isAdmin ? 'cursor-pointer' : ''
+                  } ${
                     isLight
-                      ? 'bg-stone-50 border-stone-200 shadow-md'
+                      ? 'bg-white border-stone-200 shadow-sm'
                       : 'bg-gradient-to-b from-stone-900 via-[#0d0d0d] to-black border-[#C9A84C]/40 shadow-2xl'
                   }`}
+                  title={isAdmin ? 'Haz clic para cambiar la foto (estilo Google Lens)' : undefined}
                 >
                   <img
                     src={bottlePhoto}
@@ -539,12 +568,15 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                   {isAdmin && (
                     <button
                       type="button"
-                      onClick={() => photoUploadInputRef.current?.click()}
-                      title="Cambiar foto de perfil del frasco"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsGooglePhotoModalOpen(true);
+                      }}
+                      title="Arrastrar foto desde Google o pegar con Ctrl+V"
                       className="absolute top-3 left-3 bg-black/85 hover:bg-amber-500 hover:text-stone-950 text-amber-300 px-2.5 py-1.5 rounded-xl border border-amber-400/40 text-[11px] font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-xs transition cursor-pointer z-10"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      <span>Editar Foto</span>
+                      <span>Editar Foto (Google)</span>
                     </button>
                   )}
 
@@ -577,11 +609,11 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                   <div className="flex flex-col gap-2 max-w-xs mx-auto">
                     <button
                       type="button"
-                      onClick={() => photoUploadInputRef.current?.click()}
-                      className="w-full py-2 rounded-xl bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-400/50 text-xs font-bold flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+                      onClick={() => setIsGooglePhotoModalOpen(true)}
+                      className="w-full py-2 rounded-xl bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 border border-amber-400/50 text-xs font-bold flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Cambiar Foto de Perfil Directamente</span>
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Arrastrar o Pegar Foto (Estilo Google Lens)</span>
                     </button>
                     <button
                       type="button"
@@ -589,7 +621,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                       className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#A07830] via-[#C9A84C] to-[#A07830] text-stone-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow hover:brightness-110 transition cursor-pointer"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      <span>Poner Foto Real / Editar Ficha Completa</span>
+                      <span>Editar Ficha Completa & Pirámide</span>
                     </button>
                   </div>
                 )}
@@ -631,7 +663,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                 {/* Acordes Principales (Fragrantica layout) */}
                 <div className={`p-4 rounded-2xl border space-y-2 ${
                   isLight
-                    ? 'bg-stone-50 border-stone-200'
+                    ? 'bg-white border-stone-200 shadow-xs'
                     : 'bg-[#141414] border-stone-800'
                 }`}>
                   <span className={`text-xs uppercase tracking-wider font-bold block ${
@@ -659,7 +691,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                 {/* Visual Intensity & Sillage Gauge */}
                 <div className={`p-4 rounded-2xl border space-y-2.5 ${
                   isLight
-                    ? 'bg-stone-50 border-stone-200'
+                    ? 'bg-white border-stone-200 shadow-xs'
                     : 'bg-[#141414] border-[#C9A84C]/30'
                 }`}>
                   <div className="flex items-center justify-between text-xs">
@@ -716,7 +748,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
             {/* ¿A QUÉ HUELE ESTA FRAGANCIA? (Puntual, directo y sin relleno) */}
             <div className={`p-5 sm:p-6 rounded-3xl border space-y-4 shadow-md ${
               isLight
-                ? 'bg-stone-50 border-stone-200'
+                ? 'bg-white border-stone-200 shadow-xs'
                 : 'bg-[#141414] border-[#C9A84C]/40'
             }`}>
               <div className={`flex items-center justify-between flex-wrap gap-2 border-b pb-3 ${
@@ -784,7 +816,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
             {/* CUÁNDO USARLO (Pure white / stone-50 in light mode, fixing black box from image_287d6261.png) */}
             <div className={`p-5 rounded-3xl border space-y-3 ${
               isLight
-                ? 'bg-stone-50 border-stone-200 shadow-xs text-[#09090b]'
+                ? 'bg-white border-stone-200 shadow-xs text-[#09090b]'
                 : 'bg-[#0f0f0f] border-stone-800 text-stone-100'
             }`}>
               <h4 className={`text-xs uppercase tracking-widest font-bold block ${
@@ -809,7 +841,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
             {/* PIRÁMIDE OLFATIVA (Splits compound notes into separate distinct golden badges) */}
             <div className={`p-6 rounded-3xl border space-y-6 ${
               isLight
-                ? 'bg-stone-50 border-stone-200 shadow-xs'
+                ? 'bg-white border-stone-200 shadow-xs'
                 : 'bg-[#0d0d0d] border-[#C9A84C]/35'
             }`}>
               <div className={`text-center space-y-1.5 border-b pb-3 ${
@@ -1035,7 +1067,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
               {similarItems.length === 0 ? (
                 <div className={`p-6 text-center rounded-2xl border text-xs ${
                   isLight
-                    ? 'bg-stone-50 border-stone-200 text-stone-600'
+                    ? 'bg-white border-stone-200 text-stone-600 shadow-xs'
                     : 'bg-[#121212] border-stone-800 text-stone-400'
                 }`}>
                   No hay otras fragancias en este rango con afinidad de notas compartidas suficientes.
@@ -1080,7 +1112,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                         {/* Flacon bottle real photo (Clean white / stone-50 in light mode) */}
                         <div className={`relative aspect-square rounded-xl border p-2 overflow-hidden flex items-center justify-center ${
                           isLight
-                            ? 'bg-stone-50 border-stone-200'
+                            ? 'bg-white border-stone-200 shadow-xs'
                             : 'bg-gradient-to-b from-stone-900 to-black border-stone-800/80'
                         }`}>
                           <img
@@ -1300,7 +1332,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
 
                   <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed text-left space-y-1 ${
                     isLight
-                      ? 'bg-stone-50 border-stone-200 text-stone-800'
+                      ? 'bg-white border-stone-200 text-stone-800 shadow-xs'
                       : 'bg-black/50 border-stone-800 text-stone-300'
                   }`}>
                     <span className={`font-bold text-[11px] block uppercase tracking-wide ${
@@ -1368,6 +1400,17 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
           />
         </>
       )}
+
+      {/* Google Lens Image Upload Modal for Perfume Bottle */}
+      <GoogleImageUploadModal
+        isOpen={isGooglePhotoModalOpen}
+        onClose={() => setIsGooglePhotoModalOpen(false)}
+        onImageSelected={handleGooglePhotoSelected}
+        title={`Cambiar foto de ${fragrance.name}`}
+        subtitle="Arrastra una foto del frasco desde Google, tu equipo o pega con Ctrl+V"
+        currentImage={fragrance.image || bottlePhoto}
+        theme={theme}
+      />
     </>
   );
 };

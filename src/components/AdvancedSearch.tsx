@@ -659,7 +659,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             ? 'bg-rose-50 border-rose-400 line-through opacity-70'
                             : 'bg-rose-950/30 border-rose-500 line-through opacity-60'
                           : isLight
-                          ? 'bg-stone-50 border-stone-200 hover:border-amber-400 hover:bg-amber-50/30 shadow-xs'
+                          ? 'bg-white border-stone-200 hover:border-amber-400 hover:bg-amber-50/30 shadow-xs'
                           : 'bg-[#121212] border-stone-800/80 hover:border-[#C9A84C]/50 hover:bg-[#181818]'
                       }`}
                     >

@@ -75,7 +75,7 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
       title: 'Cítrico / Acuático',
       subtitle: 'Bergamota, Limón, Brisa Marina, Frescor',
       desc: 'Energía chispeante, sol mediterráneo y notas ozónicas cristalinas que aportan vitalidad inmediata y sensación de limpieza pura.',
-      image: 'https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&w=600&q=80',
+      image: 'https://images.unsplash.com/photo-1530630458144-014709e10016?auto=format&fit=crop&w=600&q=80',
     },
     {
       id: 'Amaderado / Oriental' as MainCategory,
@@ -83,7 +83,7 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
       title: 'Amaderado / Oriental',
       subtitle: 'Sándalo, Oud, Ámbar, Especias, Cuero',
       desc: 'Presencia majestuosa, acordes cálidos y resinas profundas. Aportan distinción imponente, madurez y duración inigualable.',
-      image: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&w=600&q=80',
+      image: 'https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&w=600&q=80',
     },
     {
       id: 'Dulce / Acaramelado' as MainCategory,
@@ -188,7 +188,7 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
                     : 'bg-[#0e0e0e] border-stone-800 hover:border-[#C9A84C]/80 hover:bg-[#141414] text-stone-100'
                 }`}
               >
-                <div className={`relative aspect-4/3 rounded-2xl overflow-hidden border ${
+                <div className={`relative aspect-4/3 rounded-2xl overflow-hidden border bg-gradient-to-br from-stone-800 to-stone-950 ${
                   isLight ? 'border-stone-200' : 'border-stone-800/80'
                 }`}>
                   <img
@@ -197,7 +197,7 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20" />
                   <div className="absolute top-3 left-3 w-10 h-10 rounded-xl bg-black/70 backdrop-blur-md flex items-center justify-center text-2xl border border-stone-700 shadow">
                     {fam.emoji}
                   </div>

@@ -7,6 +7,7 @@ import {
 } from '../services/catalogStore';
 import { getRealNotePhoto } from '../data/fragranceVisuals';
 import { compressImage } from '../utils/imageCompressor';
+import { GoogleImageUploadModal } from './GoogleImageUploadModal';
 import {
   X,
   Clipboard,
@@ -72,6 +73,7 @@ export const AdminNotePhotoEditorModal: React.FC<AdminNotePhotoEditorModalProps>
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isGoogleUploadOpen, setIsGoogleUploadOpen] = useState<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -422,27 +424,18 @@ export const AdminNotePhotoEditorModal: React.FC<AdminNotePhotoEditorModalProps>
           <button
             type="button"
             disabled={isProcessing}
-            onClick={handleClipboardButton}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#A07830] via-[#C9A84C] to-[#F0D080] text-stone-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#C9A84C]/25 hover:brightness-110 transition active:scale-95 disabled:opacity-50"
+            onClick={() => setIsGoogleUploadOpen(true)}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#A07830] via-[#C9A84C] to-[#F0D080] text-stone-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#C9A84C]/25 hover:brightness-110 transition active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Optimizando imagen...</span>
-              </>
-            ) : (
-              <>
-                <Clipboard className="w-4 h-4" />
-                <span>📋 Pegar Imagen Copiada (o presiona Ctrl + V)</span>
-              </>
-            )}
+            <Sparkles className="w-4 h-4 text-stone-950" />
+            <span>Arrastrar o Pegar Foto (Estilo Google Lens / Ctrl+V)</span>
           </button>
 
           <input
             type="text"
             value={photoUrl}
             onChange={(e) => setPhotoUrl(e.target.value)}
-            placeholder="https://ejemplo.com/foto-ingrediente.jpg"
+            placeholder="https://ejemplo.com/foto-ingrediente.jpg o abre Google Lens"
             className="w-full px-3 py-2 rounded-xl bg-black border border-stone-800 focus:border-[#C9A84C] text-xs text-stone-100 placeholder-stone-600 focus:outline-none"
           />
         </div>
@@ -485,6 +478,17 @@ export const AdminNotePhotoEditorModal: React.FC<AdminNotePhotoEditorModalProps>
           </div>
         </div>
       </div>
+
+      {/* Google Lens Image Upload Modal for Olfactory Note Photo */}
+      <GoogleImageUploadModal
+        isOpen={isGoogleUploadOpen}
+        onClose={() => setIsGoogleUploadOpen(false)}
+        onImageSelected={(url) => processAndApplyImage(url, '¡Foto de la nota optimizada con éxito!')}
+        title={`Buscar foto para ${displayName || noteName}`}
+        subtitle="Arrastra una foto de la nota botánica desde Google, tu equipo o pega con Ctrl+V"
+        currentImage={photoUrl || currentVisual.photoUrl}
+        theme="dark"
+      />
     </div>
   );
 };

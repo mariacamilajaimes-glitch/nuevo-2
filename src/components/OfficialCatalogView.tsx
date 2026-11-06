@@ -236,10 +236,26 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
               {selectedGender === 'Todos' && <Check className={`w-4 h-4 ${isLight ? 'text-amber-900' : 'text-[#F0D080]'}`} />}
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <span className={`text-xl font-extrabold font-serif-luxury ${isLight ? 'text-[#09090b]' : 'text-stone-100'}`}>
+              <span className={`text-xl font-extrabold font-serif-luxury ${
+                selectedGender === 'Todos'
+                  ? isLight
+                    ? 'text-amber-950 font-black'
+                    : 'text-[#F0D080]'
+                  : isLight
+                  ? 'text-[#09090b]'
+                  : 'text-stone-100'
+              }`}>
                 {counts.total}
               </span>
-              <span className={`text-[10px] ${isLight ? 'text-stone-600 font-medium' : 'text-stone-400'}`}>Total general</span>
+              <span className={`text-[10px] font-medium ${
+                selectedGender === 'Todos'
+                  ? isLight
+                    ? 'text-amber-900/80 font-bold'
+                    : 'text-[#F0D080]/80'
+                  : isLight
+                  ? 'text-stone-600'
+                  : 'text-stone-400'
+              }`}>Total general</span>
             </div>
           </button>
 
@@ -258,14 +274,38 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-rose-900' : 'text-rose-300'}`}>Solo Dama</span>
+              <span className={`text-xs font-bold uppercase tracking-wider ${
+                selectedGender === 'Dama'
+                  ? isLight
+                    ? 'text-rose-950 font-black'
+                    : 'text-rose-200 font-black'
+                  : isLight
+                  ? 'text-rose-900 font-semibold'
+                  : 'text-rose-300'
+              }`}>Solo Dama</span>
               {selectedGender === 'Dama' && <Check className="w-4 h-4 text-rose-600 dark:text-rose-300" />}
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <span className={`text-xl font-extrabold font-serif-luxury ${isLight ? 'text-[#09090b]' : 'text-stone-100'}`}>
+              <span className={`text-xl font-extrabold font-serif-luxury ${
+                selectedGender === 'Dama'
+                  ? isLight
+                    ? 'text-rose-950 font-black'
+                    : 'text-rose-200 font-black'
+                  : isLight
+                  ? 'text-[#09090b]'
+                  : 'text-stone-100'
+              }`}>
                 {counts.dama}
               </span>
-              <span className={`text-[10px] ${isLight ? 'text-stone-600 font-medium' : 'text-stone-400'}`}>Damas</span>
+              <span className={`text-[10px] font-medium ${
+                selectedGender === 'Dama'
+                  ? isLight
+                    ? 'text-rose-900/80 font-bold'
+                    : 'text-rose-300/80'
+                  : isLight
+                  ? 'text-stone-600'
+                  : 'text-stone-400'
+              }`}>Damas</span>
             </div>
           </button>
 
@@ -284,14 +324,38 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-blue-900' : 'text-blue-300'}`}>Solo Caballero</span>
+              <span className={`text-xs font-bold uppercase tracking-wider ${
+                selectedGender === 'Caballero'
+                  ? isLight
+                    ? 'text-blue-950 font-black'
+                    : 'text-blue-200 font-black'
+                  : isLight
+                  ? 'text-blue-900 font-semibold'
+                  : 'text-blue-300'
+              }`}>Solo Caballero</span>
               {selectedGender === 'Caballero' && <Check className="w-4 h-4 text-blue-600 dark:text-blue-300" />}
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <span className={`text-xl font-extrabold font-serif-luxury ${isLight ? 'text-[#09090b]' : 'text-stone-100'}`}>
+              <span className={`text-xl font-extrabold font-serif-luxury ${
+                selectedGender === 'Caballero'
+                  ? isLight
+                    ? 'text-blue-950 font-black'
+                    : 'text-blue-200 font-black'
+                  : isLight
+                  ? 'text-[#09090b]'
+                  : 'text-stone-100'
+              }`}>
                 {counts.caballero}
               </span>
-              <span className={`text-[10px] ${isLight ? 'text-stone-600 font-medium' : 'text-stone-400'}`}>Caballeros</span>
+              <span className={`text-[10px] font-medium ${
+                selectedGender === 'Caballero'
+                  ? isLight
+                    ? 'text-blue-900/80 font-bold'
+                    : 'text-blue-300/80'
+                  : isLight
+                  ? 'text-stone-600'
+                  : 'text-stone-400'
+              }`}>Caballeros</span>
             </div>
           </button>
 
@@ -310,14 +374,38 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-amber-900' : 'text-amber-300'}`}>Solo Unisex</span>
+              <span className={`text-xs font-bold uppercase tracking-wider ${
+                selectedGender === 'Unisex'
+                  ? isLight
+                    ? 'text-amber-950 font-black'
+                    : 'text-amber-200 font-black'
+                  : isLight
+                  ? 'text-amber-900 font-semibold'
+                  : 'text-amber-300'
+              }`}>Solo Unisex</span>
               {selectedGender === 'Unisex' && <Check className="w-4 h-4 text-amber-600 dark:text-amber-300" />}
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <span className={`text-xl font-extrabold font-serif-luxury ${isLight ? 'text-[#09090b]' : 'text-stone-100'}`}>
+              <span className={`text-xl font-extrabold font-serif-luxury ${
+                selectedGender === 'Unisex'
+                  ? isLight
+                    ? 'text-amber-950 font-black'
+                    : 'text-amber-200 font-black'
+                  : isLight
+                  ? 'text-[#09090b]'
+                  : 'text-stone-100'
+              }`}>
                 {counts.unisex}
               </span>
-              <span className={`text-[10px] ${isLight ? 'text-stone-600 font-medium' : 'text-stone-400'}`}>Unisex</span>
+              <span className={`text-[10px] font-medium ${
+                selectedGender === 'Unisex'
+                  ? isLight
+                    ? 'text-amber-900/80 font-bold'
+                    : 'text-amber-300/80'
+                  : isLight
+                  ? 'text-stone-600'
+                  : 'text-stone-400'
+              }`}>Unisex</span>
             </div>
           </button>
         </div>

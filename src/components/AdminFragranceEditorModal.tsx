@@ -3,6 +3,7 @@ import { CatalogFragrance, ALL_UNIQUE_NOTES, MainCategory } from '../data/fragan
 import { saveAdminFragranceUpdate, resetAdminFragranceUpdate, getStoredOverrides, AccordItem } from '../services/catalogStore';
 import { getPerfumeBottlePhoto, computeFragranticaAccords, getAccordColor, FRAGRANTICA_ACCORD_COLORS } from '../data/fragranceVisuals';
 import { compressImage } from '../utils/imageCompressor';
+import { GoogleImageUploadModal } from './GoogleImageUploadModal';
 import {
   X,
   Upload,
@@ -132,6 +133,7 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
   const [pasteNotice, setPasteNotice] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isGooglePhotoModalOpen, setIsGooglePhotoModalOpen] = useState<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -632,20 +634,24 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-              {/* Image Preview */}
-              <div className="sm:col-span-4 relative aspect-square rounded-2xl overflow-hidden border border-[#C9A84C]/40 bg-black/80 p-2 flex items-center justify-center shadow-lg">
+              {/* Image Preview with click to open Google Lens Modal */}
+              <div
+                onClick={() => setIsGooglePhotoModalOpen(true)}
+                className="sm:col-span-4 relative aspect-square rounded-2xl overflow-hidden border border-[#C9A84C]/40 bg-black/80 p-2 flex items-center justify-center shadow-lg cursor-pointer group"
+                title="Haz clic para arrastrar o pegar imagen estilo Google Lens"
+              >
                 <img
                   src={previewPhoto}
                   alt={fragranceName || fragrance.name}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform"
                 />
                 {isProcessing && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <Loader2 className="w-6 h-6 text-[#F0D080] animate-spin" />
                   </div>
                 )}
-                <span className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] py-0.5 text-center rounded font-mono bg-black/80 backdrop-blur-sm text-[#F0D080] border border-[#C9A84C]/40">
-                  Vista Previa del Frasco
+                <span className="absolute bottom-1.5 left-1.5 right-1.5 text-[9px] py-0.5 text-center rounded font-mono bg-black/85 backdrop-blur-sm text-[#F0D080] border border-[#C9A84C]/40 group-hover:bg-[#C9A84C] group-hover:text-stone-950 transition-colors">
+                  🔍 Clic para abrir Google Lens
                 </span>
               </div>
 
@@ -654,20 +660,11 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
                 <button
                   type="button"
                   disabled={isProcessing}
-                  onClick={handleClipboardButton}
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#A07830] via-[#C9A84C] to-[#F0D080] text-stone-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:brightness-110 transition active:scale-95 disabled:opacity-50"
+                  onClick={() => setIsGooglePhotoModalOpen(true)}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#A07830] via-[#C9A84C] to-[#F0D080] text-stone-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:brightness-110 transition active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Procesando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clipboard className="w-4 h-4 text-stone-950" />
-                      <span>📋 Pegar Imagen Copiada (o presiona Ctrl + V)</span>
-                    </>
-                  )}
+                  <Search className="w-4 h-4 text-stone-950" />
+                  <span>Arrastrar o Pegar Foto (Estilo Google Lens / Ctrl+V)</span>
                 </button>
 
                 <div>
@@ -1159,6 +1156,17 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
           </div>
         </div>
       </div>
+
+      {/* Google Lens Image Upload Modal for Bottle Photo */}
+      <GoogleImageUploadModal
+        isOpen={isGooglePhotoModalOpen}
+        onClose={() => setIsGooglePhotoModalOpen(false)}
+        onImageSelected={(url) => processAndSetImage(url, '¡Foto real del frasco optimizada con éxito!')}
+        title={`Buscar foto para ${fragranceName || fragrance.name}`}
+        subtitle="Arrastra una foto del frasco desde Google, tu equipo o pega con Ctrl+V"
+        currentImage={imageUrl || previewPhoto}
+        theme="dark"
+      />
     </div>
   );
 };
