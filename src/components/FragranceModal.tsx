@@ -32,8 +32,174 @@ import {
   Check,
   Save,
   Layers,
-  Upload
+  Upload,
+  Compass
 } from 'lucide-react';
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+  Tooltip
+} from 'recharts';
+
+export interface RadarDataPoint {
+  category: string;
+  intensity: number;
+  fullMark: number;
+  color: string;
+  description: string;
+}
+
+export function computeFragranceRadarData(
+  fragrance: CatalogFragrance,
+  mainAccords: { name: string; percentage: number }[]
+): RadarDataPoint[] {
+  const familyStr = `${fragrance.family || ''} ${fragrance.subfamily || ''} ${fragrance.mainCategory || ''}`.toLowerCase();
+
+  const getAccordScore = (keywords: string[]): number => {
+    let highest = 0;
+    for (const accord of mainAccords) {
+      const accName = accord.name.toLowerCase();
+      if (keywords.some((k) => accName.includes(k))) {
+        if (accord.percentage > highest) highest = accord.percentage;
+      }
+    }
+    return highest;
+  };
+
+  const countNoteMatches = (keywords: string[]): number => {
+    let count = 0;
+    for (const note of fragrance.allNotes || []) {
+      const n = note.toLowerCase();
+      if (keywords.some((k) => n.includes(k))) count++;
+    }
+    return count;
+  };
+
+  // 1. FLORAL
+  const floralKeywords = [
+    'floral', 'rosa', 'jazmín', 'jazmin', 'lavanda', 'azahar', 'neroli',
+    'violeta', 'iris', 'lirio', 'peonía', 'peonia', 'nardo', 'tuberosa',
+    'gardenia', 'ylang', 'geranio', 'orquídea', 'orquidea', 'flor', 'flores'
+  ];
+  const floralAccord = getAccordScore(['floral', 'rosas', 'flores blancas', 'fresco floral', 'atalcado', 'floral amarillo']);
+  const floralNotesCount = countNoteMatches(floralKeywords);
+  const floralFamilyBonus = familyStr.includes('floral') ? 45 : 0;
+  let floralScore = floralAccord > 0
+    ? floralAccord
+    : Math.min(95, 20 + floralFamilyBonus + floralNotesCount * 18);
+  if (floralFamilyBonus > 0 && floralScore < 60) floralScore = 65;
+  if (floralScore === 0) floralScore = 15;
+
+  // 2. AMADERADO
+  const woodKeywords = [
+    'madera', 'amaderad', 'cedro', 'sándalo', 'sandalo', 'vetiver', 'oud',
+    'pachulí', 'patchouli', 'musgo', 'ciprés', 'cipres', 'gaiac', 'guayaco',
+    'ébano', 'ebano', 'abedul', 'pino', 'roble', 'cuero', 'leather'
+  ];
+  const woodAccord = getAccordScore(['amaderado', 'maderas', 'terroso', 'oud', 'pachulí', 'cuero', 'musgo', 'amaderada']);
+  const woodNotesCount = countNoteMatches(woodKeywords);
+  const woodFamilyBonus = familyStr.includes('amaderad') || familyStr.includes('madera') ? 45 : 0;
+  let woodScore = woodAccord > 0
+    ? woodAccord
+    : Math.min(95, 20 + woodFamilyBonus + woodNotesCount * 18);
+  if (woodFamilyBonus > 0 && woodScore < 60) woodScore = 65;
+  if (woodScore === 0) woodScore = 15;
+
+  // 3. CÍTRICO
+  const citrusKeywords = [
+    'cítric', 'citric', 'bergamota', 'limón', 'limon', 'mandarina', 'pomelo',
+    'naranja', 'lima', 'yuzu', 'pomelo rosado', 'naranjo', 'petitgrain',
+    'fresco', 'acuátic', 'acuatic', 'marina', 'marino', 'calone', 'ozónico'
+  ];
+  const citrusAccord = getAccordScore(['cítrico', 'citrico', 'fresco', 'aromático', 'aromatico', 'marino', 'acuático', 'verde']);
+  const citrusNotesCount = countNoteMatches(citrusKeywords);
+  const citrusFamilyBonus = familyStr.includes('cítric') || familyStr.includes('acuátic') ? 45 : 0;
+  let citrusScore = citrusAccord > 0
+    ? citrusAccord
+    : Math.min(95, 20 + citrusFamilyBonus + citrusNotesCount * 18);
+  if (citrusFamilyBonus > 0 && citrusScore < 60) citrusScore = 65;
+  if (citrusScore === 0) citrusScore = 15;
+
+  // 4. ESPECIADO
+  const spiceKeywords = [
+    'especiad', 'spicy', 'pimienta', 'cardamomo', 'canela', 'jengibre', 'clavo',
+    'nuez moscada', 'azafrán', 'azafran', 'anís', 'anis', 'comino', 'cilantro',
+    'oriental', 'incienso', 'ámbar', 'ambar'
+  ];
+  const spiceAccord = getAccordScore(['especiado', 'cálido especiado', 'fresco especiado', 'oriental', 'ámbar']);
+  const spiceNotesCount = countNoteMatches(spiceKeywords);
+  const spiceFamilyBonus = (familyStr.includes('especiad') || familyStr.includes('oriental')) ? 45 : 0;
+  let spiceScore = spiceAccord > 0
+    ? spiceAccord
+    : Math.min(95, 20 + spiceFamilyBonus + spiceNotesCount * 18);
+  if (spiceFamilyBonus > 0 && spiceScore < 60) spiceScore = 65;
+  if (spiceScore === 0) spiceScore = 15;
+
+  // 5. DULCE
+  const sweetKeywords = [
+    'vainilla', 'caramelo', 'tonka', 'miel', 'praliné', 'praline', 'chocolate',
+    'cacao', 'azúcar', 'azucar', 'algodón', 'dulce', 'gourmand', 'coco',
+    'malvavisco', 'benjuí', 'benjui'
+  ];
+  const sweetAccord = getAccordScore(['dulce', 'avainillado', 'gourmand', 'afrutado', 'caramelo', 'miel']);
+  const sweetNotesCount = countNoteMatches(sweetKeywords);
+  let sweetnessBase = 25;
+  if (fragrance.sweetness === 'Muy Dulce') sweetnessBase = 88;
+  else if (fragrance.sweetness === 'Moderado') sweetnessBase = 55;
+  else if (fragrance.sweetness === 'Fresco') sweetnessBase = 35;
+  else if (fragrance.sweetness === 'Seco') sweetnessBase = 18;
+
+  let sweetScore = sweetAccord > 0
+    ? Math.max(sweetAccord, sweetnessBase)
+    : Math.min(98, sweetnessBase + sweetNotesCount * 10);
+  if (familyStr.includes('dulce') || familyStr.includes('gourmand')) {
+    sweetScore = Math.max(sweetScore, 75);
+  }
+
+  const clamp = (val: number) => Math.max(15, Math.min(98, Math.round(val)));
+
+  return [
+    {
+      category: 'Floral',
+      intensity: clamp(floralScore),
+      fullMark: 100,
+      color: '#ec4899',
+      description: 'Pétalos, flores blancas y bouquet'
+    },
+    {
+      category: 'Amaderado',
+      intensity: clamp(woodScore),
+      fullMark: 100,
+      color: '#a16207',
+      description: 'Sándalo, cedro, vetiver y resinas'
+    },
+    {
+      category: 'Cítrico',
+      intensity: clamp(citrusScore),
+      fullMark: 100,
+      color: '#eab308',
+      description: 'Bergamota, limón y brisa fresca'
+    },
+    {
+      category: 'Especiado',
+      intensity: clamp(spiceScore),
+      fullMark: 100,
+      color: '#ea580c',
+      description: 'Pimienta, canela y calidez exótica'
+    },
+    {
+      category: 'Dulce',
+      intensity: clamp(sweetScore),
+      fullMark: 100,
+      color: '#d97706',
+      description: 'Vainilla, caramelo, haba tonka y miel'
+    },
+  ];
+}
 
 interface FragranceModalProps {
   fragrance: CatalogFragrance | null;
@@ -218,6 +384,9 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
     fragrance.intensity,
     fragrance.mainAccords
   );
+
+  // Radar chart data using Recharts for olfactory note intensities (Floral, Amaderado, Cítrico, Especiado, Dulce)
+  const radarData = computeFragranceRadarData(fragrance, mainAccords);
 
   // Brand config
   const brandCfg = BRAND_CONFIGS[fragrance.brand] || {
@@ -740,6 +909,162 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                   }`}>
                     <span>Radio de proyección: <strong className={isLight ? 'text-stone-900' : 'text-stone-200'}>{intensityLevels[currentLevelIdx - 1]?.sillage}</strong></span>
                     <span>{intensityLevels[currentLevelIdx - 1]?.desc}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* GRÁFICO DE RADAR OLFATIVO (RECHARTS) - Intensidades de Notas */}
+            <div className={`p-5 sm:p-7 rounded-3xl border space-y-4 shadow-md transition-all ${
+              isLight
+                ? 'bg-white border-stone-200 shadow-xs'
+                : 'bg-[#141414] border-[#C9A84C]/40'
+            }`}>
+              <div className={`flex items-center justify-between flex-wrap gap-2 border-b pb-3.5 ${
+                isLight ? 'border-stone-200' : 'border-stone-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-[#C9A84C]" />
+                  <div>
+                    <h3 className={`text-sm sm:text-base font-bold font-serif-luxury uppercase tracking-wider ${
+                      isLight ? 'text-[#926615]' : 'text-[#F0D080]'
+                    }`}>
+                      Radar Olfativo (Intensidad de Notas)
+                    </h3>
+                    <p className={`text-[11px] ${isLight ? 'text-stone-500' : 'text-stone-400'}`}>
+                      Balance multidimensional de notas: Floral, Amaderado, Cítrico, Especiado y Dulce
+                    </p>
+                  </div>
+                </div>
+                <span className={`text-[11px] font-mono font-semibold px-3 py-1 rounded-full border ${
+                  isLight
+                    ? 'bg-amber-50 text-amber-900 border-amber-300'
+                    : 'bg-black text-[#F0D080] border-[#C9A84C]/50'
+                }`}>
+                  Visualización Recharts
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center pt-1">
+                {/* Visual Radar Web */}
+                <div className="md:col-span-7 h-[280px] sm:h-[300px] w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                      <PolarGrid
+                        stroke={isLight ? '#e7e5e4' : '#292524'}
+                        strokeDasharray="3 3"
+                      />
+                      <PolarAngleAxis
+                        dataKey="category"
+                        tick={{
+                          fill: isLight ? '#1c1917' : '#f5f5f4',
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      />
+                      <PolarRadiusAxis
+                        angle={90}
+                        domain={[0, 100]}
+                        tick={false}
+                        axisLine={false}
+                      />
+                      <Radar
+                        name="Intensidad"
+                        dataKey="intensity"
+                        stroke="#C9A84C"
+                        strokeWidth={2.5}
+                        fill="#C9A84C"
+                        fillOpacity={isLight ? 0.45 : 0.4}
+                      />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as RadarDataPoint;
+                            return (
+                              <div
+                                className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold border shadow-xl ${
+                                  isLight
+                                    ? 'bg-white border-amber-300 text-stone-900 shadow-stone-400/20'
+                                    : 'bg-stone-950 border-[#C9A84C] text-stone-100 shadow-black'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: data.color }}
+                                  />
+                                  <span className="font-serif-luxury text-sm">{data.category}</span>
+                                </div>
+                                <p className="mt-1 text-xs font-mono font-bold text-[#C9A84C]">
+                                  {data.intensity}% de Intensidad
+                                </p>
+                                <p className={`text-[10px] font-normal mt-0.5 ${
+                                  isLight ? 'text-stone-600' : 'text-stone-400'
+                                }`}>
+                                  {data.description}
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Quantitative Breakdown & Note Families */}
+                <div className="md:col-span-5 space-y-3.5">
+                  <span className={`text-[11px] font-bold uppercase tracking-wider block ${
+                    isLight ? 'text-stone-700' : 'text-stone-300'
+                  }`}>
+                    Intensidades por Familia Olfativa
+                  </span>
+
+                  <div className="space-y-2.5">
+                    {radarData.map((item) => (
+                      <div
+                        key={item.category}
+                        className={`p-2.5 rounded-2xl border transition-all ${
+                          isLight
+                            ? 'bg-stone-50/80 border-stone-200'
+                            : 'bg-black/50 border-stone-800/80'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center text-xs mb-1">
+                          <span className={`font-bold flex items-center gap-2 ${
+                            isLight ? 'text-[#09090b]' : 'text-stone-100'
+                          }`}>
+                            <span
+                              className="w-2.5 h-2.5 rounded-full inline-block"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            {item.category}
+                          </span>
+                          <span className="font-mono font-extrabold text-[#C9A84C]">
+                            {item.intensity}%
+                          </span>
+                        </div>
+
+                        <div className={`h-2 rounded-full overflow-hidden ${
+                          isLight ? 'bg-stone-200' : 'bg-stone-900'
+                        }`}>
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${item.intensity}%`,
+                              backgroundColor: item.color
+                            }}
+                          />
+                        </div>
+
+                        <p className={`text-[10px] mt-1 leading-tight ${
+                          isLight ? 'text-stone-500' : 'text-stone-400'
+                        }`}>
+                          {item.description}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

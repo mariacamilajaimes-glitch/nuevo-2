@@ -64,7 +64,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose,
                   setPassword(e.target.value);
                   if (error) setError(false);
                 }}
-                placeholder="Escribe: fraganza2026"
+                placeholder="Ingresa la clave de administrador"
                 autoFocus
                 className="w-full bg-[#141414] border border-stone-800 rounded-xl pl-10 pr-4 py-3 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all"
               />
@@ -72,25 +72,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose,
             {error && (
               <div className="flex items-center gap-1.5 mt-2 text-rose-400 text-xs">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>Clave incorrecta. Usa: fraganza2026</span>
+                <span>Clave incorrecta. Inténtalo de nuevo.</span>
               </div>
             )}
           </div>
-
-          {/* Quick Access Helper */}
-          <button
-            type="button"
-            onClick={() => {
-              sessionStorage.setItem('fraganza_admin_logged', 'true');
-              setError(false);
-              setPassword('');
-              onAuthenticated();
-              onClose();
-            }}
-            className="w-full py-2.5 px-3 rounded-xl bg-stone-900 border border-[#C9A84C]/40 text-[#F0D080] hover:bg-stone-800 text-xs font-semibold flex items-center justify-center gap-2 transition"
-          >
-            <span>👑 Acceso Rápido Administrador (1 Clic)</span>
-          </button>
 
           <div className="pt-2 flex gap-3">
             <button
