@@ -556,20 +556,29 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                     value={noteSearchQuery}
                     onChange={(e) => setNoteSearchQuery(e.target.value)}
                     placeholder="Filtrar notas existentes (ej. rosa, vainilla, oud)..."
-                    className={`w-full border rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none ${
+                    className={`w-full border rounded-xl pl-10 pr-14 py-2 text-xs focus:outline-none ${
                       isLight
                         ? 'bg-stone-50 border-stone-300 text-[#09090b] placeholder-stone-400 focus:border-amber-500 shadow-xs'
                         : 'bg-[#141414] border-stone-800 text-stone-100 placeholder-stone-500 focus:border-[#C9A84C]'
                     }`}
                   />
-                  {noteSearchQuery && (
-                    <button
-                      onClick={() => setNoteSearchQuery('')}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-stone-500 hover:text-stone-900' : 'text-stone-500 hover:text-stone-300'}`}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                    {noteSearchQuery && (
+                      <img
+                        src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                        alt="Fraganza"
+                        className="h-4.5 w-auto object-contain opacity-90 drop-shadow"
+                      />
+                    )}
+                    {noteSearchQuery && (
+                      <button
+                        onClick={() => setNoteSearchQuery('')}
+                        className={`p-0.5 ${isLight ? 'text-stone-500 hover:text-stone-900' : 'text-stone-500 hover:text-stone-300'}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className={`flex items-center gap-2 self-end sm:self-auto text-xs ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
@@ -1131,12 +1140,27 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Escribe el nombre o código: D-001, C-015, U-002, Carolina Herrera..."
-              className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-sm focus:outline-none shadow-md ${
+              className={`w-full border rounded-2xl pl-12 pr-16 py-3.5 text-sm focus:outline-none shadow-md ${
                 isLight
                   ? 'bg-white border-stone-300 text-[#09090b] placeholder-stone-400 focus:border-amber-500'
                   : 'bg-[#0f0f0f] border-[#C9A84C]/40 text-stone-100 placeholder-stone-500 focus:border-[#C9A84C]'
               }`}
             />
+            {searchTerm && (
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <img
+                  src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                  alt="Fraganza"
+                  className="h-6 w-auto object-contain drop-shadow opacity-95 animate-in fade-in"
+                />
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className={`p-1 rounded-full ${isLight ? 'text-stone-400 hover:text-stone-800' : 'text-stone-500 hover:text-stone-200'}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {textSuggestions.length > 0 && (
@@ -1145,6 +1169,19 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 ? 'bg-white border-stone-200 divide-stone-200 text-[#09090b]'
                 : 'bg-[#0f0f0f] border-stone-800 divide-stone-800 text-stone-100'
             }`}>
+              <div className={`px-4 py-2.5 flex items-center justify-between text-xs font-bold ${
+                isLight ? 'bg-amber-50 text-[#926615] border-b border-amber-200' : 'bg-stone-950 text-[#F0D080] border-b border-stone-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <img
+                    src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                    alt="Logo"
+                    className="h-5 w-auto object-contain"
+                  />
+                  <span>Coincidencias Fraganza ({textSuggestions.length})</span>
+                </div>
+                <span className="font-mono text-[10px] text-stone-400">Clic para ver ficha</span>
+              </div>
               {textSuggestions.map((perfume) => {
                 const bottlePhoto = getPerfumeBottlePhoto(perfume.name, perfume.gender, perfume.image, perfume.code);
                 return (

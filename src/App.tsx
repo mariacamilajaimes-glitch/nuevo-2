@@ -314,24 +314,34 @@ export default function App() {
                     }
                   }}
                   placeholder="Buscar por nombre, marca o código (ej. Sauvage, Herrera, C-001)..."
-                  className={`w-full pl-10 pr-9 py-2 rounded-2xl text-xs sm:text-sm border transition-all duration-200 outline-none ${
+                  className={`w-full pl-10 pr-14 py-2 rounded-2xl text-xs sm:text-sm border transition-all duration-200 outline-none ${
                     theme === 'light'
                       ? 'bg-stone-50 border-stone-300 text-[#09090b] placeholder:text-stone-400 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 shadow-xs'
                       : 'bg-[#141414] border-stone-800 text-stone-100 placeholder:text-stone-500 focus:bg-black focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/25 shadow-inner'
                   }`}
                 />
-                {headerSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHeaderSearchQuery('');
-                      setIsHeaderSearchFocused(false);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-200 cursor-pointer p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-auto">
+                  {headerSearchQuery && (
+                    <img
+                      src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                      alt="Logo Fraganza"
+                      className="h-5 w-auto object-contain opacity-90 drop-shadow animate-in fade-in zoom-in-75 duration-200 shrink-0"
+                      title="Fraganza"
+                    />
+                  )}
+                  {headerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderSearchQuery('');
+                        setIsHeaderSearchFocused(false);
+                      }}
+                      className="text-stone-400 hover:text-stone-200 cursor-pointer p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Floating Quick Search Results Dropdown */}
@@ -341,17 +351,33 @@ export default function App() {
                     ? 'bg-white border-stone-200 text-[#09090b] shadow-stone-900/15'
                     : 'bg-[#121212] border-stone-800 text-stone-100 shadow-[#C9A84C]/10'
                 }`}>
-                  <div className={`px-3.5 py-2 border-b flex justify-between items-center text-[11px] font-bold ${
+                  <div className={`px-3.5 py-2.5 border-b flex justify-between items-center text-[11px] font-bold ${
                     theme === 'light' ? 'bg-stone-50 border-stone-200 text-stone-700' : 'bg-stone-950/80 border-stone-800 text-stone-400'
                   }`}>
-                    <span>Coincidencias en Catálogo ({quickSearchResults.length})</span>
+                    <div className="flex items-center gap-2">
+                      <img
+                        src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                        alt="Fraganza Logo"
+                        className="h-6 w-auto object-contain drop-shadow"
+                      />
+                      <span className="font-serif-luxury tracking-wide text-xs">
+                        Búsqueda Oficial Fraganza ({quickSearchResults.length})
+                      </span>
+                    </div>
                     <span className="text-[10px] font-mono text-amber-500">Enter para ver catálogo</span>
                   </div>
 
                   <div className="max-h-72 overflow-y-auto divide-y divide-stone-800/40">
                     {quickSearchResults.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-stone-400">
-                        No se encontraron fragancias para "{headerSearchQuery}"
+                      <div className="p-6 text-center space-y-2.5">
+                        <img
+                          src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                          alt="Fraganza"
+                          className="h-12 w-auto mx-auto object-contain opacity-85 drop-shadow"
+                        />
+                        <p className="text-xs text-stone-400 font-medium">
+                          No se encontraron fragancias para "{headerSearchQuery}"
+                        </p>
                       </div>
                     ) : (
                       quickSearchResults.slice(0, 6).map((fragrance) => (

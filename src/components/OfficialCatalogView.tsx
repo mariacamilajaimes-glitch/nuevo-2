@@ -424,21 +424,31 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por código (D-008, C-015), perfume, marca (Escada, Dior) o nota..."
-              className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none transition border ${
+              className={`w-full pl-10 pr-16 py-2.5 rounded-xl text-sm focus:outline-none transition border ${
                 isLight
                   ? 'bg-stone-50 border-stone-300 text-stone-900 placeholder-stone-500 focus:border-amber-500'
                   : 'bg-black/70 border-stone-800 focus:border-[#C9A84C] text-stone-100 placeholder-stone-500'
               }`}
             />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {searchTerm && (
+                <img
+                  src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                  alt="Fraganza"
+                  className="h-5 w-auto object-contain drop-shadow opacity-90 animate-in fade-in duration-200"
+                  title="Fraganza"
+                />
+              )}
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Family Filter Dropdown */}
@@ -480,23 +490,67 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
         </div>
       </div>
 
+      {/* ACTIVE SEARCH LOGO BANNER (Visible whenever a search query is active) */}
+      {searchTerm.trim() && (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition-all animate-in fade-in slide-in-from-top-1 ${
+          isLight
+            ? 'bg-amber-50/90 border-amber-300/80 shadow-xs text-stone-900'
+            : 'bg-gradient-to-r from-black via-[#161208] to-black border-[#C9A84C]/50 text-stone-100 shadow-xl'
+        }`}>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <img
+              src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+              alt="Fraganza Logo"
+              className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_8px_rgba(201,168,76,0.35)] shrink-0"
+            />
+            <div>
+              <h4 className={`text-xs font-bold uppercase tracking-wider font-serif-luxury flex items-center gap-2 ${
+                isLight ? 'text-[#926615]' : 'text-[#F0D080]'
+              }`}>
+                <span>Búsqueda Oficial Fraganza</span>
+                <span className="text-[10px] px-2 py-0.2 rounded-full font-mono font-bold bg-[#C9A84C]/20 border border-[#C9A84C]/40">
+                  {filteredFragrances.length} resultado{filteredFragrances.length === 1 ? '' : 's'}
+                </span>
+              </h4>
+              <p className={`text-xs mt-0.5 ${isLight ? 'text-stone-700 font-medium' : 'text-stone-300'}`}>
+                Resultados para el término <span className="font-bold underline">"{searchTerm}"</span> en nombres, marcas y notas.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSearchTerm('')}
+            className={`text-xs px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 font-bold cursor-pointer shrink-0 ${
+              isLight
+                ? 'border-amber-300 bg-white hover:bg-amber-100 text-[#926615]'
+                : 'border-[#C9A84C]/60 bg-stone-900 hover:bg-stone-800 text-[#F0D080]'
+            }`}
+          >
+            <X className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Limpiar Búsqueda</span>
+          </button>
+        </div>
+      )}
+
       {/* CATALOG GRID */}
       {filteredFragrances.length === 0 ? (
-        <div className={`p-12 text-center rounded-3xl border space-y-3 ${
+        <div className={`p-12 text-center rounded-3xl border space-y-4 ${
           isLight ? 'bg-white border-stone-200 text-[#09090b]' : 'bg-[#0f0f0f] border-stone-800 text-stone-200'
         }`}>
-          <div className={`w-12 h-12 mx-auto rounded-2xl flex items-center justify-center ${
-            isLight ? 'bg-stone-100 text-stone-600' : 'bg-stone-900 text-stone-400'
-          }`}>
-            <Filter className="w-6 h-6" />
-          </div>
-          <h3 className={`text-lg font-bold ${isLight ? 'text-[#09090b]' : 'text-stone-200'}`}>No se encontraron perfumes</h3>
+          <img
+            src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+            alt="Fraganza Logo"
+            className="h-16 w-auto mx-auto object-contain drop-shadow-[0_0_12px_rgba(201,168,76,0.35)] opacity-90"
+          />
+          <h3 className={`text-lg font-bold font-serif-luxury ${isLight ? 'text-[#09090b]' : 'text-stone-100'}`}>
+            No se encontraron perfumes para tu búsqueda
+          </h3>
           <p className={`text-xs max-w-sm mx-auto ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-            Ninguna fragancia coincide con los filtros aplicados. Intenta ampliar tus criterios.
+            Ninguna fragancia coincide con los filtros aplicados o término de búsqueda. Intenta con otro nombre, marca o código.
           </p>
           <button
             onClick={clearAllFilters}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#A07830] to-[#C9A84C] text-stone-950 font-bold text-xs uppercase"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#A07830] to-[#C9A84C] text-stone-950 font-bold text-xs uppercase shadow hover:brightness-110 cursor-pointer"
           >
             Restablecer Filtros
           </button>
