@@ -1,4 +1,5 @@
 import { CatalogFragrance, CATALOG } from '../data/fraganzaCatalog';
+import { getAdminToken } from './adminAuth';
 
 export interface SupabaseConfig {
   url: string;
@@ -7,9 +8,11 @@ export interface SupabaseConfig {
 }
 
 export const getSupabaseConfig = (): SupabaseConfig => {
-  const meta = import.meta as unknown as { env?: Record<string, string> };
-  const url = meta.env?.VITE_SUPABASE_URL || '';
-  const anonKey = meta.env?.VITE_SUPABASE_ANON_KEY || '';
+  // Acceso literal obligatorio: Vite solo sustituye `import.meta.env.VITE_*`
+  // escrito tal cual en el código. Leerlo con una variable intermedia deja los
+  // valores vacíos en el build de producción.
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
   return {
     url,
     anonKey,
@@ -244,42 +247,90 @@ export async function fetchCatalogFromSupabase(): Promise<CatalogFragrance[]> {
   }
 }
 
-export async function updateFragranceInSupabase(code: string, updates: Record<string, any>): Promise<boolean> {
+async function callCatalogAdmin(body: Record<string, unknown>): Promise<boolean> {
   const config = getSupabaseConfig();
   if (!config.isConfigured) return false;
 
-  try {
-    const payload: Record<string, any> = {};
-    if (updates.name !== undefined) payload.name = updates.name;
-    if (updates.code !== undefined) payload.code = updates.code;
-    if (updates.brand !== undefined) payload.brand = updates.brand;
-    if (updates.family !== undefined) payload.family = updates.family;
-    if (updates.subfamily !== undefined) payload.subfamily = updates.subfamily;
-    if (updates.mainCategory !== undefined) payload.main_category = updates.mainCategory;
-    // The Supabase schema uses image_url / top_notes / heart_notes / base_notes.
-    if (updates.image !== undefined) payload.image_url = updates.image;
-    if (updates.pyramid?.top !== undefined) payload.top_notes = updates.pyramid.top;
-    if (updates.pyramid?.heart !== undefined) payload.heart_notes = updates.pyramid.heart;
-    if (updates.pyramid?.base !== undefined) payload.base_notes = updates.pyramid.base;
-    if (updates.allNotes !== undefined) payload.all_notes = updates.allNotes;
-    if (updates.description !== undefined) payload.description = updates.description;
-    if (updates.intensity !== undefined) payload.intensity = updates.intensity;
-    if (updates.sweetness !== undefined) payload.sweetness = updates.sweetness;
-    if (updates.occasion !== undefined) payload.occasion = updates.occasion;
+  // RLS bloquea las escrituras anónimas: se envían a la Edge Function
+  // `catalog-admin`, que valida el token de administrador y escribe con la
+  // service role key.
+  const token = getAdminToken();
+  if (!token) return false;
 
-    const res = await fetch(`${config.url}/rest/v1/fragrances?code=eq.${encodeURIComponent(code)}`, {
-      method: 'PATCH',
+  try {
+    const res = await fetch(`${config.url}/functions/v1/catalog-admin`, {
+      method: 'POST',
       headers: {
-        'apikey': config.anonKey,
-        'Authorization': `Bearer ${config.anonKey}`,
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
+        'apikey': config.anonKey,
+        'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(body)
     });
-    return res.ok;
+
+    if (!res.ok) {
+      console.warn('Supabase rejected the change:', res.status, await res.text().catch(() => ''));
+      return false;
+    }
+    return true;
   } catch (err) {
-    console.warn('Could not update fragrance in Supabase:', err);
+    console.warn('Could not reach catalog-admin:', err);
     return false;
   }
+}
+
+export async function updateFragranceInSupabase(code: string, updates: Record<string, any>): Promise<boolean> {
+  const payload: Record<string, any> = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.code !== undefined) payload.code = updates.code;
+  if (updates.brand !== undefined) payload.brand = updates.brand;
+  if (updates.family !== undefined) payload.family = updates.family;
+  if (updates.subfamily !== undefined) payload.subfamily = updates.subfamily;
+  if (updates.mainCategory !== undefined) payload.main_category = updates.mainCategory;
+  // The Supabase schema uses image_url / top_notes / heart_notes / base_notes.
+  if (updates.image !== undefined) payload.image_url = updates.image;
+  if (updates.pyramid?.top !== undefined) payload.top_notes = updates.pyramid.top;
+  if (updates.pyramid?.heart !== undefined) payload.heart_notes = updates.pyramid.heart;
+  if (updates.pyramid?.base !== undefined) payload.base_notes = updates.pyramid.base;
+  if (updates.allNotes !== undefined) payload.all_notes = updates.allNotes;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.intensity !== undefined) payload.intensity = updates.intensity;
+  if (updates.sweetness !== undefined) payload.sweetness = updates.sweetness;
+  if (updates.occasion !== undefined) payload.occasion = updates.occasion;
+
+  if (Object.keys(payload).length === 0) return false;
+
+  return callCatalogAdmin({ action: 'update', code, updates: payload });
+}
+
+export async function insertFragranceInSupabase(updates: Record<string, any>): Promise<boolean> {
+  const code = typeof updates.code === 'string' ? updates.code.trim() : '';
+  if (!code) return false;
+
+  const payload: Record<string, any> = {};
+  for (const field of [
+    'name',
+    'code',
+    'brand',
+    'gender',
+    'family',
+    'subfamily',
+    'main_category',
+    'image_url',
+    'top_notes',
+    'heart_notes',
+    'base_notes',
+    'all_notes',
+    'description',
+    'intensity',
+    'sweetness',
+    'occasion',
+    'personality',
+    'age_range',
+    'skin_compat'
+  ]) {
+    if (updates[field] !== undefined && updates[field] !== '') payload[field] = updates[field];
+  }
+
+  return callCatalogAdmin({ action: 'insert', code, updates: payload });
 }

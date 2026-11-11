@@ -76,9 +76,14 @@ supabase link --project-ref <tu-project-ref>
 supabase secrets set ADMIN_PASSWORD="una-clave-larga-y-unica"
 supabase secrets set ADMIN_TOKEN_SECRET="$(openssl rand -hex 32)"
 
-# 4. Desplegar la función
-supabase functions deploy admin-auth --no-verify-jwt
+# 4. Desplegar las funciones
+supabase functions deploy admin-auth --no-verify-jwt --use-api
+supabase functions deploy catalog-admin --no-verify-jwt --use-api
 ```
+
+`admin-auth` valida la clave. `catalog-admin` recibe el token y guarda los
+cambios del panel en la base de datos (RLS bloquea al visitante anónimo, así
+que la escritura ocurre con la service role key del servidor).
 
 Después, en `.env` (y en las variables del repo si usas GitHub Actions):
 

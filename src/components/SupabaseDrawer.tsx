@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSupabaseConfig, SUPABASE_SQL_SCHEMA } from '../services/supabase';
+import { getSupabaseConfig, SUPABASE_SQL_SCHEMA, insertFragranceInSupabase } from '../services/supabase';
 import { CATALOG, CatalogFragrance } from '../data/fraganzaCatalog';
 import { getPerfumeBottlePhoto } from '../data/fragranceVisuals';
 import { getCustomizedFragrance, saveAdminFragranceUpdate, getCustomizedCatalog } from '../services/catalogStore';
@@ -165,21 +165,12 @@ export const SupabaseDrawer: React.FC<SupabaseDrawerProps> = ({ isOpen, onClose 
           image_url: formImageUrl
         };
 
-        const res = await fetch(`${config.url}/rest/v1/fragrances`, {
-          method: 'POST',
-          headers: {
-            'apikey': config.anonKey,
-            'Authorization': `Bearer ${config.anonKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(payload)
-        });
+        const ok = await insertFragranceInSupabase(payload);
 
-        if (res.ok) {
+        if (ok) {
           setInsertStatus('¡Perfume guardado exitosamente en tu base de datos Supabase!');
         } else {
-          setInsertStatus(`Error al guardar en Supabase: ${res.statusText}. Puedes usar el comando SQL generado abajo.`);
+          setInsertStatus('No se pudo guardar en Supabase. Inicia sesión como administrador y revisa la consola; también puedes usar el comando SQL generado abajo.');
         }
       } catch (err) {
         setInsertStatus('Error de conexión con Supabase. Usa el comando SQL generado abajo.');
@@ -222,34 +213,9 @@ export const SupabaseDrawer: React.FC<SupabaseDrawerProps> = ({ isOpen, onClose 
       description: editDescription.trim() || undefined,
     });
 
-    if (config.isConfigured) {
-      try {
-        const payload: any = {
-          name: editName.trim() || undefined,
-          code: editCode.trim() || undefined,
-          brand: editBrand.trim() || undefined,
-          top_notes: top,
-          heart_notes: heart,
-          base_notes: base,
-          all_notes: all,
-          description: editDescription.trim() || undefined,
-        };
-        if (editImageUrl.trim()) {
-          payload.image_url = editImageUrl.trim();
-        }
-        await fetch(`${config.url}/rest/v1/fragrances?code=eq.${selectedFragranceCode}`, {
-          method: 'PATCH',
-          headers: {
-            apikey: config.anonKey,
-            Authorization: `Bearer ${config.anonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch (e) {
-        console.warn('Could not patch Supabase directly:', e);
-      }
-    }
+    // `saveAdminFragranceUpdate` ya empuja el cambio a Supabase a través de la
+    // Edge Function `catalog-admin`. Antes había aquí un PATCH directo con la
+    // clave anónima que RLS rechazaba en silencio.
 
     setEditStatus(`¡Nombre, casa, código y notas del perfume ${editName || selectedFragranceCode} guardados con éxito en la subbase y en toda la web!`);
     setTimeout(() => setEditStatus(null), 3500);

@@ -79,11 +79,21 @@ verificadas (todas responden 200):
 | Almizcle | `photo-1579783902614-a3fb3927b675` | `photo-1582738411706-bfc8e691d1c2` |
 | Frambuesa | `photo-1577069808027-142277d33b5c` | `photo-1615484476889-2830f980a5e3` |
 
+## 10. Proyecto Supabase y escrituras seguras
+
+- Proyecto `fraganza` creado en `sa-east-1` con el catálogo completo:
+  **207 fragancias, 247 notas y 1759 relaciones** de pirámide.
+- El rol anónimo solo puede **leer**: RLS bloquea `INSERT`/`UPDATE`/`DELETE`.
+- Nueva Edge Function `catalog-admin`: verifica el token HMAC de `admin-auth`,
+  aplica una lista blanca de columnas y guarda con la service role key.
+- `updateFragranceInSupabase` ahora llama a esa función en lugar de hacer
+  `PATCH` directo con la clave anónima (que no escribía nada).
+
 ## Pendientes recomendados
 
-- **RLS de Supabase:** `supabase/schema.sql` solo define políticas de lectura. La
-  Edge Function controla el acceso a la interfaz, pero la base sigue sin
-  políticas de `INSERT`/`UPDATE`. Para producción, añadirlas para el rol
-  `authenticated` o migrar el panel a Supabase Auth.
+- **RLS de Supabase:** `supabase/schema.sql` solo define políticas de lectura. Las
+  escrituras del panel pasan por la Edge Function `catalog-admin`, que usa la
+  service role key. Si en el futuro se añaden más tablas editables, repetir el
+  mismo patrón.
 - **Peso del bundle:** el JavaScript pesa ~1.3 MB. Se puede dividir con `import()`
   para cargar `recharts` solo al abrir una ficha.

@@ -1,12 +1,20 @@
-import { getSupabaseConfig } from './supabase';
-
 /**
  * Autenticación del panel de administrador.
  *
  * La clave NO vive en el bundle: se valida en la Edge Function `admin-auth`
  * de Supabase (supabase/functions/admin-auth/index.ts) y el navegador solo
  * recibe un token de sesión de corta duración.
+ *
+ * Nota: la config se lee aquí directamente (no desde `supabase.ts`) para evitar
+ * una dependencia circular, porque `supabase.ts` importa `getAdminToken`.
  */
+
+function readSupabaseConfig(): { url: string; anonKey: string; isConfigured: boolean } {
+  // Acceso literal: Vite solo reemplaza `import.meta.env.VITE_*` directo.
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  return { url, anonKey, isConfigured: Boolean(url && anonKey) };
+}
 
 const SESSION_FLAG = 'fraganza_admin_logged';
 const TOKEN_KEY = 'fraganza_admin_token';
@@ -74,6 +82,11 @@ export function hasAdminSession(): boolean {
   return true;
 }
 
+/** Token de la sesión actual, o null si no hay sesión válida. */
+export function getAdminToken(): string | null {
+  return readSession()?.token ?? null;
+}
+
 /** Cierra la sesión de administrador. */
 export function clearAdminSession(): void {
   try {
@@ -105,7 +118,7 @@ export async function verifyAdminPassword(password: string): Promise<AdminAuthRe
     }
   }
 
-  const config = getSupabaseConfig();
+  const config = readSupabaseConfig();
   if (!config.isConfigured) {
     return {
       ok: false,
