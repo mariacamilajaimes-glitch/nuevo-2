@@ -1171,8 +1171,8 @@ export function computeFragranticaAccords(
 // Curated real perfume bottle portraits with crystal reflections and authentic shapes
 export const LUXURY_BOTTLE_PHOTOS: Record<string, string> = {
   // Escada (from reference image)
-  'Escada Sorbetto Rosso': '/assets/aistudio/image_8ef76aa6.png',
-  'Sorbetto Rosso': '/assets/aistudio/image_8ef76aa6.png',
+  'Escada Sorbetto Rosso': './assets/aistudio/image_8ef76aa6.png',
+  'Sorbetto Rosso': './assets/aistudio/image_8ef76aa6.png',
 
   // Carolina Herrera
   '212 VIP Men': 'https://images.unsplash.com/photo-1524638431109-93d95c968f03?auto=format&fit=crop&w=800&q=80',

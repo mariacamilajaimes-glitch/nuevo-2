@@ -24,6 +24,15 @@ const distPath = path.resolve(__dirname, '../dist');
 const docsPath = path.resolve(__dirname, '../docs');
 
 if (fs.existsSync(distPath)) {
+  // Remove previous build output first so stale hashed assets do not pile up.
+  if (fs.existsSync(docsPath)) {
+    for (const entry of fs.readdirSync(docsPath)) {
+      // Keep files that belong to GitHub Pages configuration.
+      if (entry === 'CNAME' || entry === '.nojekyll') continue;
+      fs.rmSync(path.join(docsPath, entry), { recursive: true, force: true });
+    }
+  }
+
   copyFolderRecursiveSync(distPath, docsPath);
   console.log('Successfully synced dist/ to docs/ for GitHub Pages deployment!');
 } else {

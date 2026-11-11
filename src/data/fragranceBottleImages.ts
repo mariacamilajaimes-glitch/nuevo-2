@@ -140,7 +140,7 @@ export const CATALOG_BOTTLE_PHOTOS: Record<string, string> = {
   "D-034": "https://images.unsplash.com/photo-1588405748880-12d1d2a59f75?auto=format&fit=crop&w=800&q=80",
   "D-035": "https://images.unsplash.com/photo-1587017539504-67cfbddac569?auto=format&fit=crop&w=800&q=80",
   "D-036": "https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=800&q=80",
-  "D-037": "/assets/aistudio/image_8ef76aa6.png",
+  "D-037": "./assets/aistudio/image_8ef76aa6.png",
   "D-038": "https://images.unsplash.com/photo-1587017539504-67cfbddac569?auto=format&fit=crop&w=800&q=80",
   "D-039": "https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&w=800&q=80",
   "D-040": "https://images.unsplash.com/photo-1588405748880-12d1d2a59f75?auto=format&fit=crop&w=800&q=80",
@@ -230,7 +230,14 @@ export function getFragranceBottlePhoto(codeOrName: string, gender?: string, fal
   } catch {}
 
   // 2. Direct fallback if custom URL or data URL provided
-  if (fallbackUrl && (fallbackUrl.startsWith('http') || fallbackUrl.startsWith('data:') || fallbackUrl.startsWith('/assets/'))) {
+  if (
+    fallbackUrl &&
+    (fallbackUrl.startsWith('http') ||
+      fallbackUrl.startsWith('data:') ||
+      fallbackUrl.startsWith('assets/') ||
+      fallbackUrl.startsWith('./assets/') ||
+      fallbackUrl.startsWith('/assets/'))
+  ) {
     return fallbackUrl;
   }
 

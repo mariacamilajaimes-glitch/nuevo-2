@@ -56,7 +56,6 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('fraganza_theme_mode', theme);
       if (theme === 'light') {
         document.documentElement.classList.add('theme-light');
         document.documentElement.classList.remove('theme-dark');
@@ -72,7 +71,10 @@ export default function App() {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mql = window.matchMedia('(prefers-color-scheme: light)');
     const handler = (e: MediaQueryListEvent) => {
-      const userLocked = localStorage.getItem('fraganza_theme_mode');
+      let userLocked: string | null = null;
+      try {
+        userLocked = localStorage.getItem('fraganza_theme_mode');
+      } catch {}
       if (!userLocked) {
         setTheme(e.matches ? 'light' : 'dark');
       }
@@ -84,6 +86,11 @@ export default function App() {
   const handleToggleTheme = () => {
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        // Only persist when the user explicitly chooses a theme.
+        // Without this key the app keeps following the OS light/dark setting.
+        localStorage.setItem('fraganza_theme_mode', next);
+      } catch {}
       showToast(next === 'light' ? '☀️ Modo Día activado para toda la página' : '🌙 Modo Noche activado para toda la página');
       return next;
     });
@@ -259,7 +266,7 @@ export default function App() {
                 title="FRAGANZA - Alta Perfumería"
               >
                 <img
-                  src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                  src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                   alt="Fraganza Logo"
                   className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_12px_rgba(201,168,76,0.35)] group-hover:scale-105 transition-transform duration-300"
                 />
@@ -323,7 +330,7 @@ export default function App() {
                 <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-auto">
                   {headerSearchQuery && (
                     <img
-                      src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                      src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                       alt="Logo Fraganza"
                       className="h-5 w-auto object-contain opacity-90 drop-shadow animate-in fade-in zoom-in-75 duration-200 shrink-0"
                       title="Fraganza"
@@ -356,7 +363,7 @@ export default function App() {
                   }`}>
                     <div className="flex items-center gap-2">
                       <img
-                        src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                        src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                         alt="Fraganza Logo"
                         className="h-6 w-auto object-contain drop-shadow"
                       />
@@ -371,7 +378,7 @@ export default function App() {
                     {quickSearchResults.length === 0 ? (
                       <div className="p-6 text-center space-y-2.5">
                         <img
-                          src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                          src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                           alt="Fraganza"
                           className="h-12 w-auto mx-auto object-contain opacity-85 drop-shadow"
                         />
@@ -600,6 +607,7 @@ export default function App() {
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
             theme={theme}
+            isAdmin={isAdmin}
             onNavigateToCatalog={(family) => {
               setCatalogFamilyFilter(family);
               setCatalogSearchTerm('');
@@ -771,7 +779,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 space-y-5">
           <div className="flex items-center justify-center gap-3">
             <img
-              src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+              src="./assets/aistudio/fraganza_logo_d0313cc4.png"
               alt="Fraganza"
               className="h-10 w-auto object-contain opacity-80"
             />

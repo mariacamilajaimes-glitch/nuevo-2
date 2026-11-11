@@ -256,11 +256,16 @@ export async function updateFragranceInSupabase(code: string, updates: Record<st
     if (updates.family !== undefined) payload.family = updates.family;
     if (updates.subfamily !== undefined) payload.subfamily = updates.subfamily;
     if (updates.mainCategory !== undefined) payload.main_category = updates.mainCategory;
-    if (updates.image !== undefined) payload.image = updates.image;
-    if (updates.pyramid?.top !== undefined) payload.pyramid_top = updates.pyramid.top;
-    if (updates.pyramid?.heart !== undefined) payload.pyramid_heart = updates.pyramid.heart;
-    if (updates.pyramid?.base !== undefined) payload.pyramid_base = updates.pyramid.base;
+    // The Supabase schema uses image_url / top_notes / heart_notes / base_notes.
+    if (updates.image !== undefined) payload.image_url = updates.image;
+    if (updates.pyramid?.top !== undefined) payload.top_notes = updates.pyramid.top;
+    if (updates.pyramid?.heart !== undefined) payload.heart_notes = updates.pyramid.heart;
+    if (updates.pyramid?.base !== undefined) payload.base_notes = updates.pyramid.base;
     if (updates.allNotes !== undefined) payload.all_notes = updates.allNotes;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.intensity !== undefined) payload.intensity = updates.intensity;
+    if (updates.sweetness !== undefined) payload.sweetness = updates.sweetness;
+    if (updates.occasion !== undefined) payload.occasion = updates.occasion;
 
     const res = await fetch(`${config.url}/rest/v1/fragrances?code=eq.${encodeURIComponent(code)}`, {
       method: 'PATCH',

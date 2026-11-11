@@ -10,6 +10,10 @@ node_modules
 .pnp
 .pnp.js
 
+# Build output (docs/ is the published copy)
+dist
+dist-ssr
+
 # Environment variables
 .env
 .env.local

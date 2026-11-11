@@ -565,7 +565,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                     {noteSearchQuery && (
                       <img
-                        src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                        src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                         alt="Fraganza"
                         className="h-4.5 w-auto object-contain opacity-90 drop-shadow"
                       />
@@ -1149,7 +1149,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             {searchTerm && (
               <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <img
-                  src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                  src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                   alt="Fraganza"
                   className="h-6 w-auto object-contain drop-shadow opacity-95 animate-in fade-in"
                 />
@@ -1174,7 +1174,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               }`}>
                 <div className="flex items-center gap-2">
                   <img
-                    src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                    src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                     alt="Logo"
                     className="h-5 w-auto object-contain"
                   />

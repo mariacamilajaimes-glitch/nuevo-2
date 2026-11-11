@@ -23,6 +23,7 @@ interface FamilyExplorerProps {
   onToggleFavorite: (id: string) => void;
   theme?: 'light' | 'dark';
   onNavigateToCatalog?: (family: string) => void;
+  isAdmin?: boolean;
 }
 
 export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
@@ -31,6 +32,7 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
   onToggleFavorite,
   theme = 'dark',
   onNavigateToCatalog,
+  isAdmin = false,
 }) => {
   const isLight =
     theme === 'light' ||
@@ -202,19 +204,21 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
                     {fam.emoji}
                   </div>
 
-                  {/* Poner / Cambiar Foto Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingFamilyPhoto(fam.id);
-                    }}
-                    title={`Poner o cambiar foto de la familia ${fam.title}`}
-                    className="absolute top-3 right-3 px-2.5 py-1.5 rounded-xl bg-black/85 hover:bg-amber-500 hover:text-stone-950 text-amber-300 text-[11px] font-bold border border-amber-400/40 backdrop-blur-md transition flex items-center gap-1 shadow-lg z-10 cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Poner Foto</span>
-                  </button>
+                  {/* Poner / Cambiar Foto Button (admin only) */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingFamilyPhoto(fam.id);
+                      }}
+                      title={`Poner o cambiar foto de la familia ${fam.title}`}
+                      className="absolute top-3 right-3 px-2.5 py-1.5 rounded-xl bg-black/85 hover:bg-amber-500 hover:text-stone-950 text-amber-300 text-[11px] font-bold border border-amber-400/40 backdrop-blur-md transition flex items-center gap-1 shadow-lg z-10 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Poner Foto</span>
+                    </button>
+                  )}
 
                   <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end z-10">
                     <div>

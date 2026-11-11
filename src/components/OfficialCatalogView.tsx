@@ -433,7 +433,7 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
               {searchTerm && (
                 <img
-                  src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+                  src="./assets/aistudio/fraganza_logo_d0313cc4.png"
                   alt="Fraganza"
                   className="h-5 w-auto object-contain drop-shadow opacity-90 animate-in fade-in duration-200"
                   title="Fraganza"
@@ -499,7 +499,7 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
         }`}>
           <div className="flex items-center gap-3 sm:gap-4">
             <img
-              src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+              src="./assets/aistudio/fraganza_logo_d0313cc4.png"
               alt="Fraganza Logo"
               className="h-10 sm:h-12 w-auto object-contain drop-shadow-[0_0_8px_rgba(201,168,76,0.35)] shrink-0"
             />
@@ -538,7 +538,7 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
           isLight ? 'bg-white border-stone-200 text-[#09090b]' : 'bg-[#0f0f0f] border-stone-800 text-stone-200'
         }`}>
           <img
-            src="/assets/aistudio/fraganza_logo_d0313cc4.png"
+            src="./assets/aistudio/fraganza_logo_d0313cc4.png"
             alt="Fraganza Logo"
             className="h-16 w-auto mx-auto object-contain drop-shadow-[0_0_12px_rgba(201,168,76,0.35)] opacity-90"
           />
