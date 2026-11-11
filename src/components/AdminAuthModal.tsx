@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, X, KeyRound, AlertCircle } from 'lucide-react';
+import { Lock, ShieldCheck, X, KeyRound, AlertCircle, Loader2 } from 'lucide-react';
+import { verifyAdminPassword } from '../services/adminAuth';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -9,30 +10,45 @@ interface AdminAuthModalProps {
 
 export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose, onAuthenticated }) => {
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Default admin passcode: 'fraganza2026' or 'fraganza'
-    const trimmed = password.trim().toLowerCase();
-    if (trimmed === 'fraganza2026' || trimmed === 'fraganza' || trimmed === 'admin' || trimmed === 'admin2026') {
-      sessionStorage.setItem('fraganza_admin_logged', 'true');
-      setError(false);
+    if (loading) return;
+
+    setLoading(true);
+    setError(null);
+
+    // La clave se valida en la Edge Function de Supabase: nunca se compara
+    // contra un valor incrustado en el navegador.
+    const result = await verifyAdminPassword(password);
+
+    setLoading(false);
+
+    if (result.ok) {
       setPassword('');
       onAuthenticated();
       onClose();
     } else {
-      setError(true);
+      setError(result.message ?? 'No se pudo verificar la clave. Inténtalo de nuevo.');
     }
+  };
+
+  const handleClose = () => {
+    if (loading) return;
+    setError(null);
+    setPassword('');
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-md bg-[#0f0f0f] border border-[#C9A84C]/40 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-[#C9A84C]/20 text-stone-100">
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-5 right-5 p-2 rounded-full text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors"
         >
           <X className="w-5 h-5" />
@@ -62,17 +78,19 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose,
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  if (error) setError(false);
+                  if (error) setError(null);
                 }}
                 placeholder="Ingresa la clave de administrador"
                 autoFocus
-                className="w-full bg-[#141414] border border-stone-800 rounded-xl pl-10 pr-4 py-3 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all"
+                disabled={loading}
+                autoComplete="current-password"
+                className="w-full bg-[#141414] border border-stone-800 rounded-xl pl-10 pr-4 py-3 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all disabled:opacity-60"
               />
             </div>
             {error && (
-              <div className="flex items-center gap-1.5 mt-2 text-rose-400 text-xs">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                <span>Clave incorrecta. Inténtalo de nuevo.</span>
+              <div className="flex items-start gap-1.5 mt-2 text-rose-400 text-xs">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
             )}
           </div>
@@ -80,23 +98,34 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose,
           <div className="pt-2 flex gap-3">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 py-3 rounded-xl border border-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-800 transition-colors"
+              onClick={handleClose}
+              disabled={loading}
+              className="flex-1 py-3 rounded-xl border border-stone-800 text-stone-300 text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#C9A84C] to-[#F0D080] text-stone-950 text-xs font-bold shadow-lg shadow-[#C9A84C]/25 hover:brightness-110 transition-all flex items-center justify-center gap-1.5"
+              disabled={loading}
+              className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#C9A84C] to-[#F0D080] text-stone-950 text-xs font-bold shadow-lg shadow-[#C9A84C]/25 hover:brightness-110 transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Desbloquear</span>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Verificando…</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Desbloquear</span>
+                </>
+              )}
             </button>
           </div>
         </form>
 
         <p className="text-[10px] text-stone-500 text-center mt-6">
-          Fraganza Security · Panel para mariacamila.jaimes@unet.edu.ve / camilinda14071309@gmail.com
+          Fraganza Security · La clave se valida en el servidor y nunca se envía al navegador
         </p>
       </div>
     </div>

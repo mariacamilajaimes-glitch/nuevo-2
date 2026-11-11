@@ -63,7 +63,7 @@ export const REAL_NOTE_PHOTOS: Record<string, RealNoteVisual> = {
   },
   'Violeta': {
     name: 'Violeta',
-    photoUrl: 'https://images.unsplash.com/photo-1550953159-663c1a0ad625?auto=format&fit=crop&w=300&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1541275055241-329bbdf9a191?auto=format&fit=crop&w=300&q=80',
     category: 'Florales',
     description: 'Pétalos silvestres de violeta con aroma nostálgico, verde y aterciopelado.'
   },
@@ -217,7 +217,7 @@ export const REAL_NOTE_PHOTOS: Record<string, RealNoteVisual> = {
   },
   'Melocotón': {
     name: 'Melocotón',
-    photoUrl: 'https://images.unsplash.com/photo-1595126730719-1d9863268846?auto=format&fit=crop&w=300&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1629828874514-c1e5103f2150?auto=format&fit=crop&w=300&q=80',
     category: 'Frutales',
     description: 'Durazno maduro con piel aterciopelada y pulpa almibarada.'
   },
@@ -379,13 +379,13 @@ export const REAL_NOTE_PHOTOS: Record<string, RealNoteVisual> = {
   },
   'Almizcle': {
     name: 'Almizcle',
-    photoUrl: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=300&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=300&q=80',
     category: 'Cuero & Resinas',
     description: 'Almizcle blanco limpio, efecto segunda piel, sedoso, íntimo y reconfortante.'
   },
   'almizcle': {
     name: 'almizcle',
-    photoUrl: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=300&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=300&q=80',
     category: 'Cuero & Resinas',
     description: 'Suaves fibras de almizcle blanco puro, evocando piel limpia y calidez humana.'
   },
@@ -509,7 +509,7 @@ export const REAL_NOTE_PHOTOS: Record<string, RealNoteVisual> = {
   },
   'Frambuesa': {
     name: 'Frambuesa',
-    photoUrl: 'https://images.unsplash.com/photo-1577069808027-142277d33b5c?auto=format&fit=crop&w=300&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1615484476889-2830f980a5e3?auto=format&fit=crop&w=300&q=80',
     category: 'Frutales',
     description: 'Frambuesas rojas frescas y aterciopeladas, ácidas, jugosas y golosas.'
   },

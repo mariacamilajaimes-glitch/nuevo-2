@@ -7,6 +7,7 @@ import {
   updateNoteCategoryGlobally
 } from '../services/catalogStore';
 import { getNoteDetail, FRAGRANTICA_NOTES, NoteDetail } from '../data/fragranticaNotesDictionary';
+import { hasAdminSession } from '../services/adminAuth';
 import {
   getRealNotePhoto,
   computeFragranticaAccords,
@@ -81,7 +82,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [glossaryFamily, setGlossaryFamily] = useState<string>('Todas');
 
   // Admin Note Manager modal state
-  const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('fraganza_admin_logged') === 'true';
+  const isAdmin = typeof window !== 'undefined' && hasAdminSession();
   const [isAdminNoteManagerOpen, setIsAdminNoteManagerOpen] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<'delete' | 'merge' | 'category' | 'manage_families'>('delete');
   const [adminSelectedNote, setAdminSelectedNote] = useState<string>('Vainilla');

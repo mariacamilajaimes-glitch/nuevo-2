@@ -8,6 +8,7 @@ import { FragranceModal } from './components/FragranceModal';
 import { OfficialCatalogView } from './components/OfficialCatalogView';
 import { SupabaseDrawer } from './components/SupabaseDrawer';
 import { AdminAuthModal } from './components/AdminAuthModal';
+import { hasAdminSession, clearAdminSession } from './services/adminAuth';
 import { getPerfumeBottlePhoto } from './data/fragranceVisuals';
 import {
   Sparkles,
@@ -34,13 +35,7 @@ export default function App() {
   const [selectedFragrance, setSelectedFragrance] = useState<CatalogFragrance | null>(null);
   const [isSupabaseDrawerOpen, setIsSupabaseDrawerOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('fraganza_admin_logged') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => hasAdminSession());
 
   // Global page theme (dark / light) adapted to phone/system OS settings
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -237,7 +232,7 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                sessionStorage.removeItem('fraganza_admin_logged');
+                clearAdminSession();
                 setIsAdmin(false);
                 showToast('Sesión de administrador cerrada');
               }}

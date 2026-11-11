@@ -49,9 +49,41 @@ Con eso GitHub publica el contenido de `dist/`, no el código fuente.
 - `scripts/copyBuildToDocs.cjs` ahora limpia `docs/` antes de copiar el build.
 - Se evita que queden archivos JavaScript/CSS antiguos con hashes viejos.
 
+## 8. Clave del panel admin validada en el servidor
+
+**Antes:** las claves `fraganza2026`, `fraganza`, `admin` y `admin2026` estaban
+escritas en `src/components/AdminAuthModal.tsx`. Se compilaban dentro del
+JavaScript público, así que cualquiera podía leerlas desde el navegador.
+
+**Ahora:**
+
+- La clave vive solo en los secrets de Supabase (`ADMIN_PASSWORD`).
+- La validación la hace la Edge Function `supabase/functions/admin-auth/`.
+- El navegador recibe un token firmado con HMAC válido por 1 hora.
+- La comparación es en tiempo constante y hay límite de 8 intentos por minuto.
+- Si Supabase no está configurado, el panel no se abre (falla cerrado).
+- En `npm run dev` se puede usar `VITE_ADMIN_DEV_PASSWORD`; esa rama se elimina
+  del build de producción.
+
+Instrucciones de despliegue en `README.md` → *Panel de administrador*.
+
+## 9. Imágenes de notas rotas
+
+Cuatro fotos devolvían 404 en Unsplash y se reemplazaron por imágenes
+verificadas (todas responden 200):
+
+| Nota | Antes | Ahora |
+|---|---|---|
+| Violeta | `photo-1550953159-663c1a0ad625` | `photo-1541275055241-329bbdf9a191` |
+| Melocotón | `photo-1595126730719-1d9863268846` | `photo-1629828874514-c1e5103f2150` |
+| Almizcle | `photo-1579783902614-a3fb3927b675` | `photo-1582738411706-bfc8e691d1c2` |
+| Frambuesa | `photo-1577069808027-142277d33b5c` | `photo-1615484476889-2830f980a5e3` |
+
 ## Pendientes recomendados
 
-- **Seguridad del panel admin:** las contraseñas están escritas en el código del cliente (`AdminAuthModal.tsx`). Cualquier visitante puede verlas. Para producción se recomienda Supabase Auth o un backend.
-- **RLS de Supabase:** `supabase/schema.sql` solo define políticas de lectura. Para que el panel pueda insertar o actualizar desde el navegador hacen falta políticas de `INSERT`/`UPDATE` (preferiblemente para usuarios autenticados).
-- **Imágenes 404:** cuatro fotos de notas en `fragranceVisuals.ts` devuelven 404 en Unsplash (Violeta, Melocotón, Almizcle y Frambuesa).
-- **Peso del bundle:** el JavaScript pesa ~1.3 MB. Se puede dividir con `import()` para cargar `recharts` solo al abrir una ficha.
+- **RLS de Supabase:** `supabase/schema.sql` solo define políticas de lectura. La
+  Edge Function controla el acceso a la interfaz, pero la base sigue sin
+  políticas de `INSERT`/`UPDATE`. Para producción, añadirlas para el rol
+  `authenticated` o migrar el panel a Supabase Auth.
+- **Peso del bundle:** el JavaScript pesa ~1.3 MB. Se puede dividir con `import()`
+  para cargar `recharts` solo al abrir una ficha.
