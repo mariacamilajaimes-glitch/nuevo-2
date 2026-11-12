@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CatalogFragrance, CATALOG } from './data/fraganzaCatalog';
-import { getCustomizedCatalog } from './services/catalogStore';
+import { getCustomizedCatalog, syncRemoteCatalogOverrides } from './services/catalogStore';
 import { SmartQuiz } from './components/SmartQuiz';
 import { AdvancedSearch } from './components/AdvancedSearch';
 import { FamilyExplorer } from './components/FamilyExplorer';
@@ -10,6 +10,7 @@ import { SupabaseDrawer } from './components/SupabaseDrawer';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { hasAdminSession, clearAdminSession } from './services/adminAuth';
 import { getPerfumeBottlePhoto } from './data/fragranceVisuals';
+import { includesNormalized } from './utils/textNormalize';
 import {
   Sparkles,
   Search,
@@ -95,9 +96,11 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('fraganza_fav_codes');
-      return saved ? JSON.parse(saved) : ['u-002', 'c-015', 'd-008'];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return ['u-002', 'c-015', 'd-008'];
+      return [];
     }
   });
 
@@ -172,14 +175,14 @@ export default function App() {
   }, []);
 
   const quickSearchResults = useMemo(() => {
-    const q = headerSearchQuery.trim().toLowerCase();
+    const q = headerSearchQuery.trim();
     if (!q) return [];
     return catalogList.filter((f) => {
       return (
-        f.name.toLowerCase().includes(q) ||
-        f.brand.toLowerCase().includes(q) ||
-        f.code.toLowerCase().includes(q) ||
-        (f.subfamily || '').toLowerCase().includes(q)
+        includesNormalized(f.name, q) ||
+        includesNormalized(f.brand, q) ||
+        includesNormalized(f.code, q) ||
+        includesNormalized(f.subfamily || '', q)
       );
     });
   }, [catalogList, headerSearchQuery]);
@@ -201,6 +204,12 @@ export default function App() {
     };
     window.addEventListener('fraganza_catalog_updated', handleUpdate);
     return () => window.removeEventListener('fraganza_catalog_updated', handleUpdate);
+  }, []);
+
+  // Al abrir la app, trae las ediciones compartidas desde Supabase para que
+  // todos los visitantes vean el catálogo actualizado.
+  useEffect(() => {
+    syncRemoteCatalogOverrides();
   }, []);
 
   const savedFragrances = catalogList.filter((f) => favorites.includes(f.id));

@@ -535,7 +535,7 @@ WHERE code = '${selectedFragranceCode}';`;
                 {/* Description */}
                 <div className="space-y-1.5 text-xs">
                   <label className="text-stone-300 font-semibold block">
-                    Descripción Sensorial Puntual:
+                    Descripción Sensorial:
                   </label>
                   <textarea
                     rows={2}

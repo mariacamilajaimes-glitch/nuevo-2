@@ -1,7 +1,17 @@
 import { CatalogFragrance, CATALOG, OlfactoryPyramid, MainCategory, sanitizeNotesArray } from '../data/fraganzaCatalog';
 import { idbGet, idbSet, idbDelete } from './dbStorage';
 import { compressImage } from '../utils/imageCompressor';
-import { updateFragranceInSupabase } from './supabase';
+import {
+  updateFragranceInSupabase,
+  resetFragranceInSupabase,
+  fetchCustomizedFragranceRows,
+  RemoteCustomizedRow,
+  updateNoteCategoryInSupabase,
+  upsertNoteInSupabase,
+  deleteNoteInSupabase,
+  mergeNoteInSupabase,
+  ensureNotesInSupabase
+} from './supabase';
 
 export interface AccordItem {
   name: string;
@@ -166,6 +176,89 @@ export function getStoredOverrides(): Record<string, FragranceOverride> {
   return inMemoryOverrides;
 }
 
+/**
+ * Convierte una fila personalizada de Supabase en un override local.
+ * Solo se incluyen los campos que existen en la base de datos.
+ */
+function remoteRowToOverride(row: RemoteCustomizedRow): FragranceOverride {
+  const pyramid = {
+    top: sanitizeNotesArray(row.top_notes || []),
+    heart: sanitizeNotesArray(row.heart_notes || []),
+    base: sanitizeNotesArray(row.base_notes || [])
+  };
+
+  const allNotes =
+    row.all_notes && row.all_notes.length > 0
+      ? sanitizeNotesArray(row.all_notes)
+      : [...pyramid.top, ...pyramid.heart, ...pyramid.base];
+
+  const mainAccords = Array.isArray(row.main_accords) && row.main_accords.length > 0
+    ? (row.main_accords as AccordItem[])
+    : undefined;
+
+  return {
+    name: row.name,
+    code: row.code,
+    brand: row.brand,
+    family: row.family,
+    subfamily: row.subfamily,
+    mainCategory: row.main_category as MainCategory | undefined,
+    image: row.image_url || undefined,
+    pyramid,
+    allNotes,
+    description: row.description,
+    sensation: row.sensation,
+    sweetness: row.sweetness as FragranceOverride['sweetness'],
+    intensity: row.intensity as FragranceOverride['intensity'],
+    environment: row.environment as FragranceOverride['environment'],
+    occasion: row.occasion,
+    mainAccords,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Trae desde Supabase las filas que el administrador personalizó y las aplica
+ * como overrides. De este modo las ediciones se ven en todos los dispositivos,
+ * no solo en el navegador donde se hicieron.
+ *
+ * Las filas remotas tienen prioridad sobre las locales (son la fuente
+ * compartida); los overrides puramente locales que aún no estén en Supabase se
+ * conservan.
+ */
+export async function syncRemoteCatalogOverrides(): Promise<number> {
+  try {
+    const rows = await fetchCustomizedFragranceRows();
+    if (rows.length === 0) return 0;
+
+    let applied = 0;
+    for (const row of rows) {
+      if (!row || !row.code) continue;
+      const key = row.code.toUpperCase().trim();
+      const existing = inMemoryOverrides[key] || {};
+      inMemoryOverrides[key] = {
+        ...existing,
+        ...remoteRowToOverride(row)
+      };
+      applied++;
+    }
+
+    if (applied > 0) {
+      // Guarda en local para que la próxima carga sea instantánea.
+      await idbSet(STORAGE_KEY, inMemoryOverrides);
+      writeLocalStorageSafe(STORAGE_KEY, inMemoryOverrides);
+      window.dispatchEvent(
+        new CustomEvent('fraganza_catalog_updated', { detail: { source: 'supabase_remote_sync' } })
+      );
+    }
+
+    return applied;
+  } catch (e) {
+    console.warn('Error syncing remote catalog overrides:', e);
+    return 0;
+  }
+}
+
 // Get the customized catalog with admin overrides applied
 export function getCustomizedCatalog(): CatalogFragrance[] {
   const overrides = inMemoryOverrides;
@@ -270,6 +363,15 @@ export async function saveAdminFragranceUpdate(
       console.warn('Supabase sync warning:', err);
     });
 
+    // Garantiza que todas las notas de la pirámide existan en Supabase.
+    const notesToEnsure = (updatedEntry.allNotes || []).map((name) => ({
+      name,
+      category: getStoredCustomNote(name)?.category || 'Aromática'
+    }));
+    ensureNotesInSupabase(notesToEnsure).catch((err) => {
+      console.warn('Supabase notes ensure warning:', err);
+    });
+
     // Dispatch custom event so all listeners update reactively
     window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { code, updates: updatedEntry } }));
   } catch (e) {
@@ -284,6 +386,11 @@ export async function resetAdminFragranceUpdate(code: string): Promise<void> {
 
     await idbSet(STORAGE_KEY, inMemoryOverrides);
     writeLocalStorageSafe(STORAGE_KEY, inMemoryOverrides);
+
+    // Deja de aplicar esta fila como override compartido.
+    resetFragranceInSupabase(code).catch((err) =>
+      console.warn('Supabase reset warning:', err)
+    );
 
     window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { code } }));
   } catch (e) {
@@ -334,6 +441,13 @@ export async function saveCustomNoteDetail(note: CustomNoteDetail): Promise<void
     // Dispatch events
     window.dispatchEvent(new CustomEvent('fraganza_notes_updated', { detail: { noteName: note.originalName, record } }));
     window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { noteName: note.originalName } }));
+
+    // Refleja la nota en Supabase para que el catálogo compartido quede al día.
+    upsertNoteInSupabase({
+      name: note.originalName,
+      category: note.category,
+      description: note.description
+    }).catch((err) => console.warn('Supabase note sync warning:', err));
   } catch (e) {
     console.error('Error saving custom note detail:', e);
   }
@@ -418,6 +532,9 @@ export async function deleteNoteGlobally(noteName: string): Promise<number> {
   // Also remove from custom notes storage if present
   await resetCustomNoteDetail(noteName);
 
+  // Refleja el borrado en Supabase.
+  deleteNoteInSupabase(noteName).catch((err) => console.warn('Supabase note delete warning:', err));
+
   window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { action: 'delete_note', noteName } }));
   window.dispatchEvent(new CustomEvent('fraganza_notes_updated', { detail: { action: 'delete_note', noteName } }));
 
@@ -483,6 +600,9 @@ export async function mergeNotesGlobally(fromNote: string, toNote: string): Prom
   }
   await resetCustomNoteDetail(fromNote);
 
+  // Refleja la fusión en Supabase.
+  mergeNoteInSupabase(fromNote, target).catch((err) => console.warn('Supabase note merge warning:', err));
+
   window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { action: 'merge_note', fromNote, toNote } }));
   window.dispatchEvent(new CustomEvent('fraganza_notes_updated', { detail: { action: 'merge_note', fromNote, toNote } }));
 
@@ -502,6 +622,11 @@ export async function updateNoteCategoryGlobally(noteName: string, newCategory: 
     description: existing?.description || `Nota olfativa oficial: ${noteName} (${newCategory})`,
     photoUrl: existing?.photoUrl || ''
   });
+
+  // Refleja la nueva categoría en Supabase.
+  updateNoteCategoryInSupabase(noteName, newCategory).catch((err) =>
+    console.warn('Supabase note category warning:', err)
+  );
 
   window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { action: 'update_category', noteName, newCategory } }));
   window.dispatchEvent(new CustomEvent('fraganza_notes_updated', { detail: { action: 'update_category', noteName, newCategory } }));

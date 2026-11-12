@@ -297,6 +297,11 @@ export async function updateFragranceInSupabase(code: string, updates: Record<st
   if (updates.intensity !== undefined) payload.intensity = updates.intensity;
   if (updates.sweetness !== undefined) payload.sweetness = updates.sweetness;
   if (updates.occasion !== undefined) payload.occasion = updates.occasion;
+  if (updates.sensation !== undefined) payload.sensation = updates.sensation;
+  if (updates.environment !== undefined) payload.environment = updates.environment;
+  if (updates.mainAccords !== undefined) payload.main_accords = updates.mainAccords;
+  // Marca la fila como personalizada para que el catálogo público la lea.
+  payload.is_customized = true;
 
   if (Object.keys(payload).length === 0) return false;
 
@@ -327,10 +332,136 @@ export async function insertFragranceInSupabase(updates: Record<string, any>): P
     'occasion',
     'personality',
     'age_range',
-    'skin_compat'
+    'skin_compat',
+    'sensation',
+    'environment',
+    'main_accords',
+    'is_customized'
   ]) {
     if (updates[field] !== undefined && updates[field] !== '') payload[field] = updates[field];
   }
 
+  payload.is_customized = true;
+
   return callCatalogAdmin({ action: 'insert', code, updates: payload });
+}
+
+/** Deja de aplicar una fragancia como override compartido en Supabase. */
+export async function resetFragranceInSupabase(code: string): Promise<boolean> {
+  return callCatalogAdmin({ action: 'reset', code });
+}
+
+// ---------------------------------------------------------------------------
+// Escrituras de notas olfativas (tabla `notes`)
+// ---------------------------------------------------------------------------
+
+/** Actualiza la categoría de una nota (la crea si no existía). */
+export async function updateNoteCategoryInSupabase(
+  noteName: string,
+  newCategory: string
+): Promise<boolean> {
+  return callCatalogAdmin({ action: 'note_category', noteName, newCategory });
+}
+
+/** Crea o actualiza una nota en el catálogo canónico. */
+export async function upsertNoteInSupabase(note: {
+  name: string;
+  category: string;
+  description?: string;
+}): Promise<boolean> {
+  return callCatalogAdmin({
+    action: 'note_upsert',
+    noteName: note.name,
+    newCategory: note.category,
+    description: note.description
+  });
+}
+
+/** Elimina una nota del catálogo canónico. */
+export async function deleteNoteInSupabase(noteName: string): Promise<boolean> {
+  return callCatalogAdmin({ action: 'note_delete', noteName });
+}
+
+/** Fusiona una nota duplicada/mal escrita con la canónica. */
+export async function mergeNoteInSupabase(fromNote: string, toNote: string): Promise<boolean> {
+  return callCatalogAdmin({ action: 'note_merge', noteName: fromNote, toNote });
+}
+
+/** Garantiza que una lista de notas exista en el catálogo canónico. */
+export async function ensureNotesInSupabase(
+  notes: Array<{ name: string; category?: string }>
+): Promise<boolean> {
+  if (notes.length === 0) return true;
+  return callCatalogAdmin({ action: 'notes_ensure', notes });
+}
+
+// ---------------------------------------------------------------------------
+// Lectura de las filas personalizadas desde el panel de administrador.
+// El catálogo local (JSON) sigue siendo la base; estas filas se aplican como
+// overrides para que las ediciones se vean en todos los dispositivos.
+// ---------------------------------------------------------------------------
+export interface RemoteCustomizedRow {
+  code: string;
+  name?: string;
+  brand?: string;
+  family?: string;
+  subfamily?: string;
+  main_category?: string;
+  image_url?: string;
+  top_notes?: string[];
+  heart_notes?: string[];
+  base_notes?: string[];
+  all_notes?: string[];
+  description?: string;
+  sensation?: string;
+  intensity?: string;
+  sweetness?: string;
+  occasion?: string;
+  environment?: string;
+  main_accords?: unknown;
+}
+
+export async function fetchCustomizedFragranceRows(): Promise<RemoteCustomizedRow[]> {
+  const config = getSupabaseConfig();
+  if (!config.isConfigured) return [];
+
+  try {
+    const fields = [
+      'code',
+      'name',
+      'brand',
+      'family',
+      'subfamily',
+      'main_category',
+      'image_url',
+      'top_notes',
+      'heart_notes',
+      'base_notes',
+      'all_notes',
+      'description',
+      'sensation',
+      'intensity',
+      'sweetness',
+      'occasion',
+      'environment',
+      'main_accords'
+    ].join(',');
+
+    const res = await fetch(
+      `${config.url}/rest/v1/fragrances?is_customized=eq.true&select=${fields}`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn('Could not load customized rows from Supabase:', err);
+    return [];
+  }
 }

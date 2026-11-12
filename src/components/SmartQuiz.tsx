@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CatalogFragrance, CATALOG, MainCategory } from '../data/fraganzaCatalog';
 import { getCustomizedCatalog } from '../services/catalogStore';
 import { EXPANDED_SUBFAMILIES_FOR_QUIZ } from '../data/fragranticaNotesDictionary';
+import { includesNormalized, normalizeText } from '../utils/textNormalize';
 import { QuizResultCard } from './QuizResultCard';
 import confetti from 'canvas-confetti';
 import {
@@ -43,6 +44,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
   const [currentQ, setCurrentQ] = useState<number>(0);
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [winner, setWinner] = useState<CatalogFragrance | null>(null);
+  const [winnerMatchPercent, setWinnerMatchPercent] = useState<number>(0);
 
   // User answers
   const [targetUser, setTargetUser] = useState<string>('Para mí');
@@ -160,179 +162,333 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
   };
 
   const calculateAndFinish = (finalOccasion: string) => {
-    // Ultra-precise fragrance matching engine calibrated for Fraganza catalog
+    // Motor de recomendación ponderado: compara las respuestas con las notas
+    // reales de la pirámide, la familia, la intensidad y la ocasión.
     const liveCatalog = getCustomizedCatalog();
+
+    // Normaliza texto (sin acentos ni mayúsculas) para comparar notas.
+    const n = (value: string) => normalizeText(value || '');
+    const hasAny = (haystack: string, keywords: string[]) =>
+      keywords.some((keyword) => haystack.includes(n(keyword)));
+
+    const familyDefs = EXPANDED_SUBFAMILIES_FOR_QUIZ[familyChoice] || [];
+    const selectedSubDefs = subFamilyChoices
+      .map((label) => familyDefs.find((def) => def.label === label || def.id === label))
+      .filter((def): def is NonNullable<typeof def> => Boolean(def));
+
+    const EXCLUSION_LABELS = {
+      sweet: 'Muy dulce o empalagoso',
+      strong: 'Muy fuerte o abrumador',
+      floral: 'Muy floral',
+      citrus: 'Muy cítrico',
+      woody: 'Muy amaderado u oscuro'
+    } as const;
+
+    const isDisqualified = (perfume: CatalogFragrance, notesText: string): boolean => {
+      if (exclusionChoice === EXCLUSION_LABELS.sweet) {
+        return (
+          perfume.mainCategory === 'Dulce / Acaramelado' ||
+          perfume.sweetness === 'Muy Dulce' ||
+          hasAny(notesText, ['vainilla', 'caramelo', 'praline', 'miel', 'azúcar', 'tonka', 'chocolate', 'cacao', 'coco', 'dátil'])
+        );
+      }
+      if (exclusionChoice === EXCLUSION_LABELS.strong) {
+        return (
+          perfume.intensity === 'Envolvente' ||
+          (perfume.intensity === 'Intensa' && hasAny(notesText, ['oud', 'cuero', 'tabaco', 'incienso', 'ámbar']))
+        );
+      }
+      if (exclusionChoice === EXCLUSION_LABELS.floral) {
+        return (
+          perfume.mainCategory === 'Floral' ||
+          n(perfume.family).includes('floral') ||
+          hasAny(notesText, ['rosa', 'jazmín', 'peonía', 'tuberosa', 'gardenia', 'azahar', 'ylang', 'nardo', 'flor'])
+        );
+      }
+      if (exclusionChoice === EXCLUSION_LABELS.citrus) {
+        return (
+          perfume.mainCategory === 'Cítrico / Acuático' ||
+          hasAny(notesText, ['limón', 'bergamota', 'naranja', 'mandarina', 'pomelo', 'cítrico', 'mar', 'calone', 'acuático'])
+        );
+      }
+      if (exclusionChoice === EXCLUSION_LABELS.woody) {
+        return (
+          perfume.mainCategory === 'Amaderado / Oriental' ||
+          hasAny(notesText, ['oud', 'cuero', 'incienso', 'madera', 'cedro', 'sándalo', 'pachulí', 'vetiver', 'tabaco', 'ámbar'])
+        );
+      }
+      return false;
+    };
+
     const scored = liveCatalog.map((perfume) => {
-      let score = 50;
+      const notesText = n(perfume.allNotes.join(' '));
+      const familyText = n(perfume.family + ' ' + (perfume.subfamily || ''));
+      const metaText = n(
+        [
+          perfume.personality,
+          perfume.tags.join(' '),
+          perfume.sensation,
+          perfume.description,
+          perfume.occasion,
+          perfume.environment,
+          perfume.family,
+          perfume.subfamily || ''
+        ].join(' ')
+      );
 
-      // 1. Strict Gender filtering (absolute disqualification for opposite gender)
-      if (genderChoice === 'Dama') {
-        if (perfume.gender === 'Dama') score += 40;
-        else if (perfume.gender === 'Unisex') score += 20;
-        else score -= 500; // Strict exclusion
-      } else if (genderChoice === 'Caballero') {
-        if (perfume.gender === 'Caballero') score += 40;
-        else if (perfume.gender === 'Unisex') score += 20;
-        else score -= 500; // Strict exclusion
+      let score = 0;
+
+      // 1. Género: misma categoría o unisex.
+      if (genderChoice === 'Dama' || genderChoice === 'Caballero') {
+        if (perfume.gender === genderChoice) score += 140;
+        else if (perfume.gender === 'Unisex') score += 70;
       } else {
-        // Unisex / sin preferencia
-        if (perfume.gender === 'Unisex') score += 35;
-        else score += 15;
+        score += perfume.gender === 'Unisex' ? 60 : 40;
       }
 
-      // 2. Main family category match (Question 5)
+      // 2. Familia principal (la respuesta más importante).
       if (perfume.mainCategory === familyChoice) {
-        score += 60;
-      } else if (perfume.family.toLowerCase().includes(familyChoice.toLowerCase().split(' ')[0])) {
-        score += 25;
+        score += 180;
+      } else {
+        const familyKey = n(familyChoice).split(' ')[0];
+        if (familyKey && familyText.includes(familyKey)) score += 70;
+        else score -= 40;
       }
 
-      // 3. Sub-families & specific accords matching (Question 6)
-      const allNotesLower = perfume.allNotes.join(' ').toLowerCase();
-      const tagsLower = perfume.tags.join(' ').toLowerCase();
+      // 3. Subfamilias elegidas: coincidencia con notas reales de la pirámide.
+      selectedSubDefs.forEach((def) => {
+        const sampleMatches = def.notesSample.filter((sample) =>
+          notesText.includes(n(sample))
+        ).length;
+        if (sampleMatches > 0) score += 30 + Math.min(sampleMatches, 2) * 35;
 
-      subFamilyChoices.forEach((sub) => {
-        // Find corresponding sub definition in dictionary for note samples
-        const subTerms = sub.toLowerCase().replace(/[\(\),]/g, ' ').split(' ').filter((w) => w.length > 3);
-        const matchesWord = subTerms.some((term) => allNotesLower.includes(term) || tagsLower.includes(term));
-        if (matchesWord) score += 25;
-
-        // Give high bonus if exact core note matches
-        if (sub.includes('Rosa') && allNotesLower.includes('rosa')) score += 30;
-        if (sub.includes('Jazmín') && allNotesLower.includes('jazm')) score += 30;
-        if (sub.includes('Vainilla') && allNotesLower.includes('vainill')) score += 30;
-        if (sub.includes('Caramelo') && (allNotesLower.includes('caramel') || allNotesLower.includes('dulce'))) score += 30;
-        if (sub.includes('Bergamota') && (allNotesLower.includes('bergamot') || allNotesLower.includes('limón'))) score += 30;
-        if (sub.includes('Brisa marina') && (allNotesLower.includes('mar') || allNotesLower.includes('acuát') || allNotesLower.includes('calone'))) score += 30;
-        if (sub.includes('Oud') && (allNotesLower.includes('oud') || allNotesLower.includes('resina'))) score += 30;
-        if (sub.includes('Madera') && (allNotesLower.includes('sándal') || allNotesLower.includes('cedro') || allNotesLower.includes('madera'))) score += 30;
-        if (sub.includes('Cuero') && allNotesLower.includes('cuero')) score += 30;
-        if (sub.includes('Ámbar') && allNotesLower.includes('ámbar')) score += 30;
+        const groupWords = n(def.subgroup + ' ' + def.label)
+          .split(/\s+/)
+          .filter((word) => word.length > 3);
+        if (groupWords.some((word) => familyText.includes(word))) score += 25;
       });
 
-      // 4. Skin chemistry & Intensity calibration (Question 3 & 4)
+      // 4. Química de la piel.
       if (skinType === 'Piel Seca') {
-        // Dry skin needs rich fixatives (amber, woods, vanilla, tonka) and high intensity
-        if (perfume.skinCompat === 'Piel Seca') score += 30;
-        if (allNotesLower.includes('ámbar') || allNotesLower.includes('cedro') || allNotesLower.includes('sándal') || allNotesLower.includes('vainill')) {
-          score += 20;
-        }
-        if (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente') score += 25;
+        if (perfume.skinCompat === 'Piel Seca') score += 45;
+        if (hasAny(notesText, ['ámbar', 'cedro', 'sándalo', 'vainilla', 'tonka', 'almizcle'])) score += 30;
+        if (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente') score += 30;
       } else if (skinType === 'Piel Grasa') {
-        // Oily skin projects and retains easily; thrives with fresh, citrus, aquatic, and moderate intensity
-        if (perfume.skinCompat === 'Piel Grasa') score += 30;
-        if (allNotesLower.includes('limón') || allNotesLower.includes('bergamot') || allNotesLower.includes('mar') || allNotesLower.includes('acuát')) {
-          score += 20;
-        }
-        if (perfume.intensity === 'Suave' || perfume.intensity === 'Moderada') score += 25;
-        if (perfume.sweetness === 'Muy Dulce' && perfume.intensity === 'Envolvente') score -= 30; // Prevents overly cloying
+        if (perfume.skinCompat === 'Piel Grasa') score += 45;
+        if (hasAny(notesText, ['limón', 'bergamota', 'mar', 'acuático', 'calone'])) score += 30;
+        if (perfume.intensity === 'Suave' || perfume.intensity === 'Moderada') score += 30;
+        if (perfume.sweetness === 'Muy Dulce' && perfume.intensity === 'Envolvente') score -= 40;
+      } else if (perfume.skinCompat === 'Versátil' || perfume.skinCompat === 'Piel Mixta') {
+        score += 35;
+      }
+
+      // 5. Intensidad deseada: exacta, cercana o contraria.
+      const intensityOrder = ['Suave', 'Moderada', 'Intensa', 'Envolvente'];
+      const wantedIntensity =
+        intensityChoice === 'Suave / Fresca'
+          ? 'Suave'
+          : intensityChoice === 'Intensa'
+          ? 'Intensa'
+          : 'Moderada';
+      const wantedIdx = intensityOrder.indexOf(wantedIntensity);
+      const actualIdx = intensityOrder.indexOf(perfume.intensity);
+      if (wantedIdx === actualIdx) score += 90;
+      else if (Math.abs(wantedIdx - actualIdx) === 1) score += 35;
+      else score -= 55;
+
+      // 6. Personalidad / qué busca en un perfume.
+      const personalityMap: Record<string, string[]> = {
+        'Inolvidable': ['inolvidable', 'seductor', 'memorable', 'magnético', 'distinción', 'elegante'],
+        'Agradable': ['agradable', 'equilibrado', 'encantador', 'amigable', 'dulce', 'limpio'],
+        'Versatil': ['versátil', 'diario', 'casual', 'fácil'],
+        'Fresco y comodo': ['fresco', 'cómodo', 'limpio', 'brisa', 'ligero', 'acuático'],
+        'Fuerte': ['fuerte', 'potente', 'audaz', 'oud', 'cuero', 'intenso'],
+        'Suave': ['suave', 'sutil', 'discreto', 'íntimo', 'delicado']
+      };
+      if (hasAny(metaText, personalityMap[personalityChoice] || [])) score += 70;
+      if (personalityChoice === 'Versatil' && perfume.environment === 'Indistinto') score += 30;
+      if (personalityChoice === 'Fresco y comodo' && perfume.mainCategory === 'Cítrico / Acuático') score += 40;
+      if (
+        (personalityChoice === 'Fuerte' || personalityChoice === 'Inolvidable') &&
+        (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente')
+      ) {
+        score += 35;
+      }
+      if (personalityChoice === 'Suave' && perfume.intensity === 'Suave') score += 35;
+
+      // 7. Ocasión de uso.
+      const occasionMap: Record<string, string[]> = {
+        'Ocasiones especiales': ['fiesta', 'cita', 'noche', 'seductor', 'especial', 'gala'],
+        'Oficina / Trabajo': ['oficina', 'trabajo', 'formal', 'discreto', 'limpio', 'ejecutivo'],
+        'Todo uso / Diario': ['diario', 'casual', 'versátil', 'día', 'todo uso'],
+        'Deportivo / Activo': ['deporte', 'activo', 'fresco', 'gimnasio', 'energía']
+      };
+      if (hasAny(metaText, occasionMap[finalOccasion] || [])) score += 65;
+      if (finalOccasion === 'Ocasiones especiales' && perfume.environment === 'Noche') score += 35;
+      if (finalOccasion === 'Oficina / Trabajo' && perfume.environment === 'Día') score += 25;
+      if (finalOccasion === 'Todo uso / Diario' && perfume.environment === 'Indistinto') score += 30;
+
+      // 8. Afinidad de edad.
+      const ageMatch = n(perfume.ageRange).match(/(\d{1,2})\s*[-–]\s*(\d{1,2})/);
+      const userAge = ageRange.includes('46') ? 46 : parseInt(ageRange, 10);
+      if (ageMatch && !Number.isNaN(userAge)) {
+        const perfumeStart = parseInt(ageMatch[1], 10);
+        const perfumeEnd = parseInt(ageMatch[2], 10);
+        if (userAge >= perfumeStart && userAge <= perfumeEnd) score += 50;
+        else if (Math.abs(userAge - (perfumeStart + perfumeEnd) / 2) <= 12) score += 20;
+        else score -= 15;
+      }
+
+      // 9. Coherencia del dulzor con la familia elegida.
+      if (familyChoice === 'Dulce / Acaramelado') {
+        if (perfume.sweetness === 'Muy Dulce') score += 45;
+        else if (perfume.sweetness === 'Moderado') score += 15;
+        else score -= 25;
+      } else if (familyChoice === 'Cítrico / Acuático') {
+        if (perfume.sweetness === 'Fresco' || perfume.sweetness === 'Seco') score += 35;
+      }
+
+      // 10. Popularidad: solo como desempate suave.
+      if (perfume.popularity === 'Alta') score += 6;
+
+      // Afinidad real (0–100 %): evalúa cada dimensión por separado con un
+      // peso fijo, para no mostrar un porcentaje inventado.
+      let matchPoints = 0;
+      const addDimension = (weight: number, ratio: number) => {
+        matchPoints += weight * Math.max(0, Math.min(1, ratio));
+      };
+
+      // Género (15)
+      addDimension(
+        15,
+        genderChoice === 'Dama' || genderChoice === 'Caballero'
+          ? perfume.gender === genderChoice
+            ? 1
+            : perfume.gender === 'Unisex'
+            ? 0.6
+            : 0
+          : perfume.gender === 'Unisex'
+          ? 1
+          : 0.8
+      );
+
+      // Familia (25)
+      const familyKeyForMatch = n(familyChoice).split(' ')[0];
+      addDimension(
+        25,
+        perfume.mainCategory === familyChoice
+          ? 1
+          : familyKeyForMatch && familyText.includes(familyKeyForMatch)
+          ? 0.5
+          : 0
+      );
+
+      // Subfamilias (15)
+      if (selectedSubDefs.length === 0) {
+        addDimension(15, 0.75);
       } else {
-        if (perfume.skinCompat === 'Versátil' || perfume.skinCompat === 'Piel Mixta') score += 25;
+        const subRatios: number[] = selectedSubDefs.map((def) => {
+          const sampleMatches = def.notesSample.filter((sample) =>
+            notesText.includes(n(sample))
+          ).length;
+          if (sampleMatches > 0) return 1;
+          const groupWords = n(def.subgroup + ' ' + def.label)
+            .split(/\s+/)
+            .filter((word) => word.length > 3);
+          return groupWords.some((word) => familyText.includes(word)) ? 0.5 : 0;
+        });
+        addDimension(
+          15,
+          subRatios.reduce((total, value) => total + value, 0) / subRatios.length
+        );
       }
 
-      // 5. Desired Intensity (Question 4)
-      if (intensityChoice === 'Suave / Fresca') {
-        if (perfume.intensity === 'Suave') score += 35;
-        else if (perfume.intensity === 'Moderada') score += 15;
-        else score -= 40;
-      } else if (intensityChoice === 'Equilibrada') {
-        if (perfume.intensity === 'Moderada') score += 40;
-        else score += 10;
-      } else if (intensityChoice === 'Intensa') {
-        if (perfume.intensity === 'Intensa') score += 40;
-        else if (perfume.intensity === 'Envolvente') score += 35;
-        else score -= 40;
+      // Piel (10)
+      let skinRatio = 0.5;
+      if (skinType === 'Piel Seca') {
+        skinRatio =
+          perfume.skinCompat === 'Piel Seca'
+            ? 1
+            : hasAny(notesText, ['ámbar', 'cedro', 'sándalo', 'vainilla', 'tonka', 'almizcle']) &&
+              (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente')
+            ? 0.8
+            : 0.4;
+      } else if (skinType === 'Piel Grasa') {
+        skinRatio =
+          perfume.skinCompat === 'Piel Grasa'
+            ? 1
+            : hasAny(notesText, ['limón', 'bergamota', 'mar', 'acuático', 'calone']) &&
+              (perfume.intensity === 'Suave' || perfume.intensity === 'Moderada')
+            ? 0.8
+            : 0.4;
+      } else {
+        skinRatio =
+          perfume.skinCompat === 'Versátil' || perfume.skinCompat === 'Piel Mixta' ? 1 : 0.6;
       }
+      addDimension(10, skinRatio);
 
-      // 6. Exclusion filter (Question 7 - Strict elimination of dislikes)
-      if (exclusionChoice === 'Muy dulce o empalagoso') {
-        if (perfume.sweetness === 'Muy Dulce' || perfume.mainCategory === 'Dulce / Acaramelado' || allNotesLower.includes('algodón')) {
-          score -= 150;
-        }
-      } else if (exclusionChoice === 'Muy fuerte o abrumador') {
-        if (perfume.intensity === 'Envolvente' || (perfume.intensity === 'Intensa' && allNotesLower.includes('oud'))) {
-          score -= 150;
-        }
-      } else if (exclusionChoice === 'Muy floral') {
-        if (perfume.mainCategory === 'Floral' || perfume.family.includes('Floral')) {
-          score -= 150;
-        }
-      } else if (exclusionChoice === 'Muy cítrico') {
-        if (perfume.mainCategory === 'Cítrico / Acuático' || allNotesLower.includes('limón') || allNotesLower.includes('pomelo')) {
-          score -= 150;
-        }
-      } else if (exclusionChoice === 'Muy amaderado u oscuro') {
-        if (perfume.mainCategory === 'Amaderado / Oriental' || allNotesLower.includes('oud') || allNotesLower.includes('cuero') || allNotesLower.includes('incienso')) {
-          score -= 150;
-        }
+      // Intensidad (10)
+      const intensityDistance = Math.abs(wantedIdx - actualIdx);
+      addDimension(10, intensityDistance === 0 ? 1 : intensityDistance === 1 ? 0.6 : 0.2);
+
+      // Personalidad (10)
+      const personalityHit = hasAny(metaText, personalityMap[personalityChoice] || []);
+      const personalityBonus =
+        (personalityChoice === 'Versatil' && perfume.environment === 'Indistinto') ||
+        (personalityChoice === 'Fresco y comodo' &&
+          perfume.mainCategory === 'Cítrico / Acuático') ||
+        ((personalityChoice === 'Fuerte' || personalityChoice === 'Inolvidable') &&
+          (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente')) ||
+        (personalityChoice === 'Suave' && perfume.intensity === 'Suave');
+      addDimension(10, personalityHit ? 1 : personalityBonus ? 0.7 : 0.4);
+
+      // Ocasión (10)
+      const occasionHit = hasAny(metaText, occasionMap[finalOccasion] || []);
+      const occasionBonus =
+        (finalOccasion === 'Ocasiones especiales' && perfume.environment === 'Noche') ||
+        (finalOccasion === 'Oficina / Trabajo' && perfume.environment === 'Día') ||
+        (finalOccasion === 'Todo uso / Diario' && perfume.environment === 'Indistinto');
+      addDimension(10, occasionHit ? 1 : occasionBonus ? 0.7 : 0.4);
+
+      // Edad (5)
+      let ageRatio = 0.5;
+      if (ageMatch && !Number.isNaN(userAge)) {
+        const perfumeStart = parseInt(ageMatch[1], 10);
+        const perfumeEnd = parseInt(ageMatch[2], 10);
+        if (userAge >= perfumeStart && userAge <= perfumeEnd) ageRatio = 1;
+        else if (Math.abs(userAge - (perfumeStart + perfumeEnd) / 2) <= 12) ageRatio = 0.6;
+        else ageRatio = 0.3;
       }
+      addDimension(5, ageRatio);
 
-      // 7. Qué buscas en un perfume (Question 7)
-      const personalityLower = (perfume.personality + ' ' + perfume.tags.join(' ') + ' ' + perfume.sensation + ' ' + perfume.description).toLowerCase();
-      if (personalityChoice === 'Inolvidable') {
-        if (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente' || personalityLower.includes('inolvidable') || personalityLower.includes('seductor') || personalityLower.includes('memorable') || personalityLower.includes('magnético') || personalityLower.includes('distinción')) {
-          score += 45;
-        }
-      } else if (personalityChoice === 'Agradable') {
-        if (perfume.intensity === 'Moderada' || personalityLower.includes('agradable') || personalityLower.includes('equilibrado') || personalityLower.includes('encantador') || personalityLower.includes('amigable') || personalityLower.includes('dulce') || personalityLower.includes('limpio')) {
-          score += 45;
-        }
-      } else if (personalityChoice === 'Versatil') {
-        if (perfume.environment === 'Indistinto' || personalityLower.includes('versátil') || personalityLower.includes('diario') || personalityLower.includes('casual') || perfume.skinCompat === 'Versátil') {
-          score += 45;
-        }
-      } else if (personalityChoice === 'Fresco y comodo') {
-        if (perfume.mainCategory === 'Cítrico / Acuático' || personalityLower.includes('fresco') || personalityLower.includes('cómodo') || personalityLower.includes('limpio') || personalityLower.includes('brisa') || personalityLower.includes('ligero')) {
-          score += 45;
-        }
-      } else if (personalityChoice === 'Fuerte') {
-        if (perfume.intensity === 'Intensa' || perfume.intensity === 'Envolvente' || personalityLower.includes('fuerte') || personalityLower.includes('potente') || personalityLower.includes('audaz') || personalityLower.includes('oud') || personalityLower.includes('cuero')) {
-          score += 45;
-        }
-      } else if (personalityChoice === 'Suave') {
-        if (perfume.intensity === 'Suave' || personalityLower.includes('suave') || personalityLower.includes('sutil') || personalityLower.includes('discreto') || personalityLower.includes('íntimo') || personalityLower.includes('delicado')) {
-          score += 45;
-        }
-      }
-
-      // 8. Occasion match (Question 9)
-      const occasionLower = (perfume.occasion + ' ' + perfume.description + ' ' + perfume.environment).toLowerCase();
-      if (finalOccasion === 'Ocasiones especiales') {
-        if (occasionLower.includes('fiesta') || occasionLower.includes('cita') || occasionLower.includes('noche') || occasionLower.includes('seductor')) {
-          score += 40;
-        }
-      } else if (finalOccasion === 'Oficina / Trabajo') {
-        if (occasionLower.includes('oficina') || occasionLower.includes('trabajo') || occasionLower.includes('formal') || occasionLower.includes('discreto') || occasionLower.includes('limpio')) {
-          score += 40;
-        }
-      } else if (finalOccasion === 'Todo uso / Diario') {
-        if (occasionLower.includes('diario') || occasionLower.includes('casual') || occasionLower.includes('versátil') || occasionLower.includes('día')) {
-          score += 40;
-        }
-      } else if (finalOccasion === 'Deportivo / Activo') {
-        if (occasionLower.includes('deporte') || occasionLower.includes('activo') || occasionLower.includes('fresco') || occasionLower.includes('gimnasio')) {
-          score += 40;
-        }
-      }
-
-      // 8. Age affinity (Question 2)
-      const agePrefix = ageRange.split('–')[0];
-      if (perfume.ageRange.includes(agePrefix)) {
-        score += 20;
-      }
-
-      // 9. Popularity multiplier
-      if (perfume.popularity === 'Alta') {
-        score += 8;
-      }
-
-      return { perfume, score };
+      return {
+        perfume,
+        score,
+        disqualified: isDisqualified(perfume, notesText),
+        matchPercent: Math.round(matchPoints)
+      };
     });
 
-    scored.sort((a, b) => b.score - a.score);
-    const topMatch = scored[0]?.perfume || liveCatalog[0] || CATALOG[0];
+    // Si pidió evitar algo, se descartan esos perfumes; si quedan muy pocas
+    // opciones, se aplica una penalización fuerte en lugar de eliminarlos.
+    let candidates = scored.filter((item) => !item.disqualified);
+    if (candidates.length < 5) {
+      candidates = scored.map((item) => ({
+        ...item,
+        score: item.disqualified ? item.score - 400 : item.score
+      }));
+    }
 
-    setWinner(topMatch);
+    candidates.sort((a, b) => b.score - a.score);
+    const topMatch = candidates[0] || {
+      perfume: liveCatalog[0] || CATALOG[0],
+      score: 0,
+      disqualified: false,
+      matchPercent: 0
+    };
+
+    setWinner(topMatch.perfume);
+    setWinnerMatchPercent(topMatch.matchPercent);
     setIsFinished(true);
 
     // Launch luxury gold confetti
@@ -350,6 +506,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
     setCurrentQ(0);
     setIsFinished(false);
     setWinner(null);
+    setWinnerMatchPercent(0);
     setSubFamilyChoices([]);
   };
 
@@ -357,6 +514,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
     return (
       <QuizResultCard
         winner={winner}
+        matchPercent={winnerMatchPercent}
         occasionAnswer={occasionChoice}
         skinAnswer={skinType}
         intensityAnswer={intensityChoice}
@@ -815,12 +973,11 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               {(EXPANDED_SUBFAMILIES_FOR_QUIZ[familyChoice] || [])
                 .filter((sub) => {
                   if (!subfamilyFilter.trim()) return true;
-                  const q = subfamilyFilter.toLowerCase();
                   return (
-                    sub.label.toLowerCase().includes(q) ||
-                    sub.desc.toLowerCase().includes(q) ||
-                    sub.subgroup.toLowerCase().includes(q) ||
-                    sub.notesSample.some((n) => n.toLowerCase().includes(q))
+                    includesNormalized(sub.label, subfamilyFilter) ||
+                    includesNormalized(sub.desc, subfamilyFilter) ||
+                    includesNormalized(sub.subgroup, subfamilyFilter) ||
+                    sub.notesSample.some((n) => includesNormalized(n, subfamilyFilter))
                   );
                 })
                 .map((sub) => {

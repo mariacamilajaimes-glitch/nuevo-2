@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { CatalogFragrance, CATALOG } from '../data/fraganzaCatalog';
 import { getPerfumeBottlePhoto, getRealNotePhoto } from '../data/fragranceVisuals';
 import { getCustomizedCatalog } from '../services/catalogStore';
+import { includesNormalized } from '../utils/textNormalize';
+import { SmartBottleImage } from './SmartBottleImage';
 import { AdminFragranceEditorModal } from './AdminFragranceEditorModal';
 import {
   Search,
@@ -106,8 +108,8 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
       // Family filter
       if (selectedFamily !== 'Todas') {
         const matchesFamily =
-          fragrance.family.toLowerCase().includes(selectedFamily.toLowerCase()) ||
-          (fragrance.subfamily && fragrance.subfamily.toLowerCase().includes(selectedFamily.toLowerCase()));
+          includesNormalized(fragrance.family, selectedFamily) ||
+          (fragrance.subfamily ? includesNormalized(fragrance.subfamily, selectedFamily) : false);
         if (!matchesFamily) return false;
       }
 
@@ -118,13 +120,13 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
 
       // Search term
       if (searchTerm.trim() !== '') {
-        const q = searchTerm.toLowerCase().trim();
-        const matchesCode = fragrance.code.toLowerCase().includes(q);
-        const matchesName = fragrance.name.toLowerCase().includes(q);
-        const matchesBrand = fragrance.brand.toLowerCase().includes(q);
-        const matchesFamily = fragrance.family.toLowerCase().includes(q);
-        const matchesNotes = (fragrance.allNotes || []).some((n) => n.toLowerCase().includes(q));
-        const matchesSensation = fragrance.sensation?.toLowerCase().includes(q);
+        const q = searchTerm.trim();
+        const matchesCode = includesNormalized(fragrance.code, q);
+        const matchesName = includesNormalized(fragrance.name, q);
+        const matchesBrand = includesNormalized(fragrance.brand, q);
+        const matchesFamily = includesNormalized(fragrance.family, q);
+        const matchesNotes = (fragrance.allNotes || []).some((n) => includesNormalized(n, q));
+        const matchesSensation = includesNormalized(fragrance.sensation || '', q);
 
         if (!matchesCode && !matchesName && !matchesBrand && !matchesFamily && !matchesNotes && !matchesSensation) {
           return false;
@@ -577,9 +579,10 @@ export const OfficialCatalogView: React.FC<OfficialCatalogViewProps> = ({
                     ? 'bg-stone-50 border-stone-200'
                     : 'bg-gradient-to-b from-stone-900 via-[#101010] to-black border-stone-800/80'
                 }`}>
-                  <img
+                  <SmartBottleImage
                     src={bottlePhoto}
                     alt={perfume.name}
+                    isLight={isLight}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-contain group-hover:scale-108 transition-transform duration-500 drop-shadow-[0_8px_16px_rgba(0,0,0,0.2)]"
                     loading="lazy"

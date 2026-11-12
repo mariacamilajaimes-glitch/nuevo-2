@@ -8,6 +8,8 @@ import {
 } from '../services/catalogStore';
 import { getNoteDetail, FRAGRANTICA_NOTES, NoteDetail } from '../data/fragranticaNotesDictionary';
 import { hasAdminSession } from '../services/adminAuth';
+import { includesNormalized, normalizeText } from '../utils/textNormalize';
+import { SmartBottleImage } from './SmartBottleImage';
 import {
   getRealNotePhoto,
   computeFragranticaAccords,
@@ -71,7 +73,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [noteSearchQuery, setNoteSearchQuery] = useState<string>('');
 
   // Included & Excluded notes
-  const [includedNotes, setIncludedNotes] = useState<string[]>(['Vainilla']);
+  const [includedNotes, setIncludedNotes] = useState<string[]>([]);
   const [excludedNotes, setExcludedNotes] = useState<string[]>([]);
 
   // Active note detail modal state (¿A qué huele esta nota?)
@@ -169,10 +171,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       });
     }
 
-    // Filter by search query
+    // Filter by search query (ignora acentos: "ambar" encuentra "Ámbar")
     if (noteSearchQuery.trim()) {
-      const q = noteSearchQuery.toLowerCase();
-      list = list.filter((n) => n.toLowerCase().includes(q));
+      list = list.filter((n) => includesNormalized(n, noteSearchQuery));
     }
 
     // Sort by popularity (frequency in catalog) so most common notes appear first
@@ -252,17 +253,17 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       else if (pyramidPosition === 'base') candidateNotes = perfume.pyramid.base;
       else candidateNotes = perfume.allNotes;
 
-      const candLower = candidateNotes.map((n) => n.toLowerCase());
+      const candLower = candidateNotes.map((n) => normalizeText(n));
 
       // Check excluded notes: if any match, reject perfume
       const hasExcluded = excludedNotes.some((ex) =>
-        perfume.allNotes.some((pn) => pn.toLowerCase().includes(ex.toLowerCase()))
+        perfume.allNotes.some((pn) => includesNormalized(pn, ex))
       );
       if (hasExcluded) return null;
 
       // Check matched included notes
       const matched = includedNotes.filter((inc) =>
-        candLower.some((cn) => cn.includes(inc.toLowerCase()) || inc.toLowerCase().includes(cn))
+        candLower.some((cn) => cn.includes(normalizeText(inc)) || normalizeText(inc).includes(cn))
       );
 
       // If user selected included notes, only show perfumes that match at least 1 note
@@ -295,18 +296,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
     return catalogList.filter(
       (f) =>
-        f.name.toLowerCase().includes(q) ||
-        f.brand.toLowerCase().includes(q) ||
-        f.code.toLowerCase().includes(q)
+        includesNormalized(f.name, q) ||
+        includesNormalized(f.brand, q) ||
+        includesNormalized(f.code, q)
     ).slice(0, 10);
   }, [catalogList, searchTerm]);
 
   // Fragrances that contain the selected note in detail modal
   const perfumesWithSelectedNote = useMemo(() => {
     if (!selectedNoteDetail) return [];
-    const target = selectedNoteDetail.name.toLowerCase();
+    const target = selectedNoteDetail.name;
     return catalogList.filter((f) =>
-      f.allNotes.some((n) => n.toLowerCase().includes(target) || target.includes(n.toLowerCase()))
+      f.allNotes.some((n) => includesNormalized(n, target) || includesNormalized(target, n))
     ).slice(0, 8);
   }, [catalogList, selectedNoteDetail]);
 
@@ -317,9 +318,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       const matchFamily = glossaryFamily === 'Todas' || n.family === glossaryFamily;
       const matchText =
         !glossarySearch.trim() ||
-        n.name.toLowerCase().includes(glossarySearch.toLowerCase()) ||
-        n.description.toLowerCase().includes(glossarySearch.toLowerCase()) ||
-        n.subgroup.toLowerCase().includes(glossarySearch.toLowerCase());
+        includesNormalized(n.name, glossarySearch) ||
+        includesNormalized(n.description, glossarySearch) ||
+        includesNormalized(n.subgroup, glossarySearch);
       return matchFamily && matchText;
     });
   }, [glossaryFamily, glossarySearch]);
@@ -901,9 +902,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             ? 'bg-stone-50 border-stone-200'
                             : 'bg-gradient-to-b from-stone-900 to-black border-stone-800/80'
                         }`}>
-                          <img
+                          <SmartBottleImage
                             src={bottlePhoto}
                             alt={perfume.name}
+                            isLight={isLight}
                             className={`w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 ${
                               isLight ? 'drop-shadow-[0_4px_10px_rgba(0,0,0,0.12)]' : 'drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]'
                             }`}
@@ -1197,9 +1199,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       <div className={`w-12 h-14 rounded-xl border p-1 shrink-0 overflow-hidden ${
                         isLight ? 'bg-stone-50 border-stone-200' : 'bg-black border-stone-800'
                       }`}>
-                        <img
+                        <SmartBottleImage
                           src={bottlePhoto}
                           alt={perfume.name}
+                          isLight={isLight}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-contain"
                         />

@@ -13,6 +13,7 @@ import {
   BRAND_CONFIGS,
   getPerfumeBottlePhoto
 } from '../data/fragranceVisuals';
+import { SmartBottleImage } from './SmartBottleImage';
 import {
   Sparkles,
   Flame,
@@ -27,6 +28,7 @@ import {
 
 interface QuizResultCardProps {
   winner: CatalogFragrance;
+  matchPercent?: number;
   occasionAnswer: string;
   skinAnswer: string;
   intensityAnswer: string;
@@ -39,6 +41,7 @@ interface QuizResultCardProps {
 
 export const QuizResultCard: React.FC<QuizResultCardProps> = ({
   winner,
+  matchPercent = 0,
   occasionAnswer,
   skinAnswer,
   intensityAnswer,
@@ -134,9 +137,10 @@ export const QuizResultCard: React.FC<QuizResultCardProps> = ({
                 ? 'bg-stone-50 border-stone-200'
                 : 'bg-gradient-to-b from-stone-900 via-[#0d0d0d] to-black border-[#C9A84C]/40'
             }`}>
-              <img
+              <SmartBottleImage
                 src={bottlePhoto}
                 alt={winner.name}
+                isLight={isLight}
                 className="w-full h-full object-contain drop-shadow-[0_8px_30px_rgba(201,168,76,0.2)] group-hover:scale-105 transition-transform duration-500"
               />
 
@@ -189,10 +193,10 @@ export const QuizResultCard: React.FC<QuizResultCardProps> = ({
               <span className={`text-2xl sm:text-3xl font-extrabold font-serif-luxury block ${
                 isLight ? 'text-[#09090b]' : 'text-transparent bg-clip-text bg-gradient-to-r from-[#F0D080] via-white to-[#F0D080]'
               }`}>
-                99.4% de Coincidencia
+                {matchPercent > 0 ? `${matchPercent}% de Afinidad` : 'Afinidad Calculada'}
               </span>
               <p className={`text-[11px] leading-tight pt-0.5 ${isLight ? 'text-stone-600' : 'text-stone-300'}`}>
-                Compatibilidad total con tu perfil: {skinAnswer} · {winner.intensity} · {occasionAnswer}
+                Compatibilidad con tu perfil: {skinAnswer} · {intensityAnswer} · {occasionAnswer}
               </p>
             </div>
           </div>
@@ -290,7 +294,7 @@ export const QuizResultCard: React.FC<QuizResultCardProps> = ({
           </div>
         </div>
 
-        {/* ¿A QUÉ HUELE ESTA FRAGANCIA? (Puntual y directo) */}
+        {/* ¿A QUÉ HUELE ESTA FRAGANCIA? (directo) */}
         <div className="mt-8 p-5 sm:p-6 rounded-3xl bg-[#141414] border border-[#C9A84C]/40 space-y-4 shadow-xl">
           <div className="flex items-center justify-between flex-wrap gap-2 border-b border-stone-800 pb-3">
             <div className="flex items-center gap-2">
@@ -300,7 +304,7 @@ export const QuizResultCard: React.FC<QuizResultCardProps> = ({
               </h3>
             </div>
             <span className="text-[11px] text-stone-400 font-mono">
-              Perfil Olfativo Puntual
+              Perfil Olfativo
             </span>
           </div>
 

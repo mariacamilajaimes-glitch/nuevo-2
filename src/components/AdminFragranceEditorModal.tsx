@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CatalogFragrance, ALL_UNIQUE_NOTES, MainCategory } from '../data/fraganzaCatalog';
 import { saveAdminFragranceUpdate, resetAdminFragranceUpdate, getStoredOverrides, AccordItem } from '../services/catalogStore';
-import { getPerfumeBottlePhoto, computeFragranticaAccords, getAccordColor, FRAGRANTICA_ACCORD_COLORS } from '../data/fragranceVisuals';
+import { getPerfumeBottlePhoto, computeFragranticaAccords, getAccordColor, FRAGRANTICA_ACCORD_COLORS, syncAccordsWithNotes } from '../data/fragranceVisuals';
 import { compressImage } from '../utils/imageCompressor';
+import { includesNormalized } from '../utils/textNormalize';
 import { GoogleImageUploadModal } from './GoogleImageUploadModal';
 import {
   X,
@@ -345,7 +346,15 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
     const parsedHeart = cleanArray(heartNotes);
     const parsedBase = cleanArray(baseNotes);
     const allParsedNotes = Array.from(new Set([...parsedTop, ...parsedHeart, ...parsedBase]));
-    const sortedAccords = [...accordsList].sort((a, b) => b.percentage - a.percentage);
+    // Sincroniza los acordes con las notas: conserva los ajustes manuales y
+    // añade automáticamente cualquier nota nueva que no exista en la pirámide.
+    const sortedAccords = syncAccordsWithNotes(
+      accordsList,
+      fragranceFamily.trim() || fragrance.family,
+      allParsedNotes,
+      fragrance.sweetness,
+      fragrance.intensity
+    );
 
     try {
       let finalImg = imageUrl.trim();
@@ -933,7 +942,7 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
 
                 <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-stone-950/80 rounded-xl border border-stone-800/80">
                   {ALL_UNIQUE_NOTES.filter((n) =>
-                    !notePickerSearch.trim() || n.toLowerCase().includes(notePickerSearch.toLowerCase().trim())
+                    !notePickerSearch.trim() || includesNormalized(n, notePickerSearch)
                   )
                     .slice(0, 40)
                     .map((n) => {
@@ -1100,16 +1109,16 @@ export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps>
             </div>
           </div>
 
-          {/* DESCRIPCIÓN SENSORIAL PUNTUAL */}
+          {/* DESCRIPCIÓN SENSORIAL */}
           <div className="p-5 rounded-2xl bg-[#141414] border border-stone-800 space-y-3">
             <label className="block text-xs uppercase font-bold tracking-wider text-[#F0D080]">
-              Descripción Sensorial Puntual:
+              Descripción Sensorial:
             </label>
             <textarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descripción concisa y puntual de cómo huele este perfume..."
+              placeholder="Descripción concisa de cómo huele este perfume..."
               className="w-full bg-black/70 border border-stone-800 rounded-xl p-3 text-xs text-stone-100 focus:outline-none focus:border-[#C9A84C] resize-none"
             />
           </div>

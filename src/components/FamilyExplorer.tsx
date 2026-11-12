@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CatalogFragrance, MainCategory } from '../data/fraganzaCatalog';
 import { getPerfumeBottlePhoto } from '../data/fragranceVisuals';
 import { getCustomizedCatalog, getStoredFamilyPhoto, saveFamilyPhoto } from '../services/catalogStore';
+import { includesNormalized } from '../utils/textNormalize';
+import { SmartBottleImage } from './SmartBottleImage';
 import { GoogleImageUploadModal } from './GoogleImageUploadModal';
 import {
   ChevronRight,
@@ -109,11 +111,11 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
       if (selectedFamily && selectedFamily !== 'Todas' && f.mainCategory !== selectedFamily) return false;
       if (genderFilter !== 'Todos' && f.gender !== genderFilter) return false;
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = f.name.toLowerCase().includes(q);
-        const matchesBrand = f.brand.toLowerCase().includes(q);
-        const matchesCode = f.code.toLowerCase().includes(q);
-        const matchesSubfamily = (f.subfamily || '').toLowerCase().includes(q);
+        const q = searchQuery.trim();
+        const matchesName = includesNormalized(f.name, q);
+        const matchesBrand = includesNormalized(f.brand, q);
+        const matchesCode = includesNormalized(f.code, q);
+        const matchesSubfamily = includesNormalized(f.subfamily || '', q);
         if (!matchesName && !matchesBrand && !matchesCode && !matchesSubfamily) return false;
       }
       return true;
@@ -602,9 +604,10 @@ export const FamilyExplorer: React.FC<FamilyExplorerProps> = ({
                       ? 'bg-stone-50 border-stone-200'
                       : 'bg-gradient-to-b from-stone-900 to-black border-stone-800'
                   }`}>
-                    <img
+                    <SmartBottleImage
                       src={getPerfumeBottlePhoto(perfume.name, perfume.gender, perfume.image, perfume.code)}
                       alt={perfume.name}
+                      isLight={isLight}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                     />

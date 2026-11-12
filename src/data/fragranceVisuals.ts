@@ -1168,6 +1168,101 @@ export function computeFragranticaAccords(
   });
 }
 
+// --- Acordes derivados de las notas (para el panel de administrador) ---
+
+/** Relación nota → acorde. Se usa para que una nota nueva se refleje como acorde. */
+const NOTE_TO_ACCORD: { accord: string; keywords: string[] }[] = [
+  { accord: 'cítrico', keywords: ['limon', 'bergamota', 'mandarina', 'naranja', 'pomelo', 'citr'] },
+  { accord: 'verde', keywords: ['hoja', 'verde', 'galbano', 'te verde', 'menta', 'hierba', 'vetiver'] },
+  { accord: 'afrutados', keywords: ['pera', 'sandia', 'fresa', 'manzana', 'grosella', 'fruta', 'melocoton', 'pina', 'cereza', 'mango', 'frambuesa', 'lichi', 'kiwi', 'uva', 'higo', 'ciruela', 'datil', 'granada'] },
+  { accord: 'almizclado', keywords: ['almizcle', 'musk', 'ambret', 'cashmeran'] },
+  { accord: 'amaderado', keywords: ['cedro', 'sandalo', 'madera', 'oud', 'guayaco', 'cipres', 'pachuli'] },
+  { accord: 'aromático', keywords: ['lavanda', 'romero', 'salvia', 'albahaca', 'tomillo', 'estragon', 'geranio'] },
+  { accord: 'atalcado', keywords: ['iris', 'violeta', 'heliotropo', 'polvo', 'orris'] },
+  { accord: 'fresco especiado', keywords: ['jengibre', 'cardamomo', 'pimienta rosa', 'cilantro'] },
+  { accord: 'fresco', keywords: ['fresc', 'agua', 'ozono', 'ozonico'] },
+  { accord: 'florales', keywords: ['rosa', 'jazmin', 'peonia', 'flor', 'neroli', 'azahar', 'magnolia', 'nardo', 'gardenia', 'lirio', 'ylang', 'mimosa', 'osmanto', 'tilo'] },
+  { accord: 'ámbar', keywords: ['ambar', 'benjui', 'ladano', 'resina'] },
+  { accord: 'dulce', keywords: ['vainilla', 'vainill', 'caramelo', 'praline', 'azucar', 'tonka', 'miel', 'cacao', 'chocolate', 'cafe'] },
+  { accord: 'cuero', keywords: ['cuero', 'gamuza', 'abedul'] },
+  { accord: 'marino', keywords: ['mar', 'sal', 'calone', 'algas'] },
+  { accord: 'especiado', keywords: ['canela', 'clavo', 'nuez moscada', 'pimienta', 'comino', 'anis', 'azafran'] },
+  { accord: 'balsámico', keywords: ['incienso', 'mirra', 'opoponax', 'balsamo', 'elemi', 'benzoina'] },
+  { accord: 'terroso', keywords: ['tierra', 'musgo', 'trufa'] }
+];
+
+function stripAccents(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/** Devuelve el acorde al que pertenece una nota, o null si no se reconoce. */
+export function deriveAccordForNote(note: string): string | null {
+  const n = stripAccents(note);
+  if (!n) return null;
+  for (const rule of NOTE_TO_ACCORD) {
+    if (rule.keywords.some((keyword) => n.includes(keyword))) return rule.accord;
+  }
+  return null;
+}
+
+/**
+ * Mantiene los acordes sincronizados con las notas.
+ *
+ * - Conserva los acordes y porcentajes que el administrador ya haya ajustado.
+ * - Añade los acordes que se desprendan de las notas nuevas.
+ * - Si una nota no pertenece a ningún acorde conocido, se añade ella misma
+ *   como acorde (así nunca "desaparece" una nota recién escrita).
+ */
+export function syncAccordsWithNotes(
+  existing: { name: string; percentage: number; color?: string; textColor?: string }[],
+  family: string,
+  allNotes: string[],
+  sweetness: string,
+  intensity: string
+): MainAccord[] {
+  const byName = new Map<string, MainAccord>();
+
+  for (const accord of existing) {
+    const key = stripAccents(accord.name);
+    if (!key) continue;
+    const palette = getAccordColor(accord.name);
+    byName.set(key, {
+      name: accord.name.toLowerCase().trim(),
+      color: accord.color || palette.color,
+      textColor: accord.textColor || palette.textColor,
+      percentage: typeof accord.percentage === 'number' ? accord.percentage : 50
+    });
+  }
+
+  // Acordes derivados de las reglas generales (familia + notas)
+  for (const accord of computeFragranticaAccords(family, allNotes, sweetness, intensity)) {
+    const key = stripAccents(accord.name);
+    if (key && !byName.has(key)) byName.set(key, accord);
+  }
+
+  // Notas que no encajan en ningún acorde: se añaden con su propio nombre
+  for (const note of allNotes) {
+    const key = stripAccents(note);
+    if (!key) continue;
+    const derived = deriveAccordForNote(note);
+    if (derived) continue;
+    if (byName.has(key)) continue;
+    const palette = getAccordColor(note);
+    byName.set(key, {
+      name: note.trim().toLowerCase(),
+      color: palette.color,
+      textColor: palette.textColor,
+      percentage: 50
+    });
+  }
+
+  return [...byName.values()].sort((a, b) => b.percentage - a.percentage);
+}
+
 // Curated real perfume bottle portraits with crystal reflections and authentic shapes
 export const LUXURY_BOTTLE_PHOTOS: Record<string, string> = {
   // Escada (from reference image)

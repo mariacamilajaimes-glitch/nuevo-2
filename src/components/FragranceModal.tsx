@@ -18,6 +18,7 @@ import {
 } from '../data/fragranceVisuals';
 import { getCustomizedFragrance, saveAdminFragranceUpdate } from '../services/catalogStore';
 import { compressImage } from '../utils/imageCompressor';
+import { SmartBottleImage } from './SmartBottleImage';
 import { AdminFragranceEditorModal } from './AdminFragranceEditorModal';
 import { AdminNotePhotoEditorModal } from './AdminNotePhotoEditorModal';
 import { GoogleImageUploadModal } from './GoogleImageUploadModal';
@@ -723,9 +724,10 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                   }`}
                   title={isAdmin ? 'Haz clic para cambiar la foto (estilo Google Lens)' : undefined}
                 >
-                  <img
+                  <SmartBottleImage
                     src={bottlePhoto}
                     alt={fragrance.name}
+                    isLight={isLight}
                     className={`w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 ${
                       isLight
                         ? 'drop-shadow-[0_8px_16px_rgba(0,0,0,0.12)]'
@@ -1070,7 +1072,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
               </div>
             </div>
 
-            {/* ¿A QUÉ HUELE ESTA FRAGANCIA? (Puntual, directo y sin relleno) */}
+            {/* ¿A QUÉ HUELE ESTA FRAGANCIA? (directo y sin relleno) */}
             <div className={`p-5 sm:p-6 rounded-3xl border space-y-4 shadow-md ${
               isLight
                 ? 'bg-white border-stone-200 shadow-xs'
@@ -1088,7 +1090,7 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                   </h3>
                 </div>
                 <span className={`text-[11px] font-mono ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                  Perfil Olfativo Puntual
+                  Perfil Olfativo
                 </span>
               </div>
 
@@ -1440,9 +1442,10 @@ export const FragranceModal: React.FC<FragranceModalProps> = ({
                             ? 'bg-white border-stone-200 shadow-xs'
                             : 'bg-gradient-to-b from-stone-900 to-black border-stone-800/80'
                         }`}>
-                          <img
+                          <SmartBottleImage
                             src={simBottle}
                             alt={sim.name}
+                            isLight={isLight}
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-contain group-hover:scale-108 transition-transform duration-300"
                           />
