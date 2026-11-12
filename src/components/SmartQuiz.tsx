@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CatalogFragrance, CATALOG, MainCategory } from '../data/fraganzaCatalog';
 import { getCustomizedCatalog } from '../services/catalogStore';
-import { EXPANDED_SUBFAMILIES_FOR_QUIZ } from '../data/fragranticaNotesDictionary';
+import {
+  QuizConfig,
+  getQuizOptionLabel,
+  getQuizQuestion,
+  getQuizSubfamilies
+} from '../data/quizConfig';
+import {
+  getCachedQuizConfig,
+  loadQuizConfig,
+  subscribeQuizConfig
+} from '../services/quizConfigStore';
 import { includesNormalized, normalizeText } from '../utils/textNormalize';
 import { QuizResultCard } from './QuizResultCard';
 import confetti from 'canvas-confetti';
@@ -40,58 +50,47 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
   const isLight =
     theme === 'light' ||
     (typeof document !== 'undefined' && document.documentElement.classList.contains('theme-light'));
-  // Current question index: 0 through 8
+  // Current question index: 0 through 9
   const [currentQ, setCurrentQ] = useState<number>(0);
   const [isFinished, setIsFinished] = useState<boolean>(false);
   const [winner, setWinner] = useState<CatalogFragrance | null>(null);
   const [winnerMatchPercent, setWinnerMatchPercent] = useState<number>(0);
+  const [quizConfig, setQuizConfig] = useState<QuizConfig>(() => getCachedQuizConfig());
 
-  // User answers
-  const [targetUser, setTargetUser] = useState<string>('Para mí');
-  const [genderChoice, setGenderChoice] = useState<string>('Unisex / Sin preferencia');
-  const [ageRange, setAgeRange] = useState<string>('21–30 años');
+  // User answers: se guardan los `id` internos de cada opción. Así el panel
+  // puede cambiar los textos sin romper el algoritmo.
+  const [targetUser, setTargetUser] = useState<string>('me');
+  const [genderChoice, setGenderChoice] = useState<string>('Unisex');
+  const [ageRange, setAgeRange] = useState<string>('21-30');
   const [skinType, setSkinType] = useState<string>('Normal');
   const [intensityChoice, setIntensityChoice] = useState<string>('Equilibrada');
   const [familyChoice, setFamilyChoice] = useState<MainCategory>('Amaderado / Oriental');
   const [subFamilyChoices, setSubFamilyChoices] = useState<string[]>([]);
   const [subfamilyFilter, setSubfamilyFilter] = useState<string>('');
-  const [personalityChoice, setPersonalityChoice] = useState<string>('Elegante & Sofisticada');
-  const [exclusionChoice, setExclusionChoice] = useState<string>('Estoy abierto/a a todo');
-  const [occasionChoice, setOccasionChoice] = useState<string>('Ocasiones especiales');
+  const [personalityChoice, setPersonalityChoice] = useState<string>('Inolvidable');
+  const [exclusionChoice, setExclusionChoice] = useState<string>('open');
+  const [occasionChoice, setOccasionChoice] = useState<string>('special');
 
-  const isForMe = targetUser === 'Para mí';
+  const isForMe = targetUser === 'me';
 
-  // Subfamilies map based on Question 5
-  const subFamiliesMap: Record<MainCategory, string[]> = {
-    'Floral': [
-      'Rosa romántica',
-      'Jazmín elegante',
-      'Lavanda fresca',
-      'Flores dulces avainilladas',
-      'Peonía suave'
-    ],
-    'Dulce / Acaramelado': [
-      'Vainilla cremosa',
-      'Caramelo y pralinés',
-      'Coco dulce',
-      'Café y cacao',
-      'Miel y tonka'
-    ],
-    'Cítrico / Acuático': [
-      'Limón y bergamota',
-      'Naranja y mandarina',
-      'Brisa marina fresca',
-      'Cítricos tropicales',
-      'Pomelo intenso'
-    ],
-    'Amaderado / Oriental': [
-      'Madera suave y elegante (sándalo, cedro)',
-      'Cuero intenso',
-      'Tabaco sofisticado',
-      'Oud árabe',
-      'Ámbar y especias orientales'
-    ]
-  };
+  // Carga la configuración compartida desde Supabase y escucha cambios del
+  // panel de administrador sin recargar la página.
+  useEffect(() => {
+    let active = true;
+    loadQuizConfig().then((next) => {
+      if (active) setQuizConfig(next);
+    });
+    const unsubscribe = subscribeQuizConfig((next) => setQuizConfig(next));
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const question = (id: number) => getQuizQuestion(quizConfig, id);
+  const optionLabel = (questionId: number, optionId: string) =>
+    getQuizOptionLabel(quizConfig, questionId, optionId);
+  const familySubfamilies = getQuizSubfamilies(quizConfig, familyChoice);
 
   const handleSelectAnswer = (qIndex: number, answer: any) => {
     switch (qIndex) {
@@ -140,15 +139,15 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
     }
   };
 
-  const handleToggleSubfamily = (sub: string) => {
+  const handleToggleSubfamily = (subId: string) => {
     let next: string[];
-    if (subFamilyChoices.includes(sub)) {
-      next = subFamilyChoices.filter(s => s !== sub);
+    if (subFamilyChoices.includes(subId)) {
+      next = subFamilyChoices.filter((s) => s !== subId);
     } else {
       if (subFamilyChoices.length >= 2) {
-        next = [subFamilyChoices[1], sub];
+        next = [subFamilyChoices[1], subId];
       } else {
-        next = [...subFamilyChoices, sub];
+        next = [...subFamilyChoices, subId];
       }
     }
     setSubFamilyChoices(next);
@@ -171,47 +170,39 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
     const hasAny = (haystack: string, keywords: string[]) =>
       keywords.some((keyword) => haystack.includes(n(keyword)));
 
-    const familyDefs = EXPANDED_SUBFAMILIES_FOR_QUIZ[familyChoice] || [];
+    const familyDefs = getQuizSubfamilies(quizConfig, familyChoice);
     const selectedSubDefs = subFamilyChoices
-      .map((label) => familyDefs.find((def) => def.label === label || def.id === label))
+      .map((id) => familyDefs.find((def) => def.id === id))
       .filter((def): def is NonNullable<typeof def> => Boolean(def));
 
-    const EXCLUSION_LABELS = {
-      sweet: 'Muy dulce o empalagoso',
-      strong: 'Muy fuerte o abrumador',
-      floral: 'Muy floral',
-      citrus: 'Muy cítrico',
-      woody: 'Muy amaderado u oscuro'
-    } as const;
-
     const isDisqualified = (perfume: CatalogFragrance, notesText: string): boolean => {
-      if (exclusionChoice === EXCLUSION_LABELS.sweet) {
+      if (exclusionChoice === 'sweet') {
         return (
           perfume.mainCategory === 'Dulce / Acaramelado' ||
           perfume.sweetness === 'Muy Dulce' ||
           hasAny(notesText, ['vainilla', 'caramelo', 'praline', 'miel', 'azúcar', 'tonka', 'chocolate', 'cacao', 'coco', 'dátil'])
         );
       }
-      if (exclusionChoice === EXCLUSION_LABELS.strong) {
+      if (exclusionChoice === 'strong') {
         return (
           perfume.intensity === 'Envolvente' ||
           (perfume.intensity === 'Intensa' && hasAny(notesText, ['oud', 'cuero', 'tabaco', 'incienso', 'ámbar']))
         );
       }
-      if (exclusionChoice === EXCLUSION_LABELS.floral) {
+      if (exclusionChoice === 'floral') {
         return (
           perfume.mainCategory === 'Floral' ||
           n(perfume.family).includes('floral') ||
           hasAny(notesText, ['rosa', 'jazmín', 'peonía', 'tuberosa', 'gardenia', 'azahar', 'ylang', 'nardo', 'flor'])
         );
       }
-      if (exclusionChoice === EXCLUSION_LABELS.citrus) {
+      if (exclusionChoice === 'citrus') {
         return (
           perfume.mainCategory === 'Cítrico / Acuático' ||
           hasAny(notesText, ['limón', 'bergamota', 'naranja', 'mandarina', 'pomelo', 'cítrico', 'mar', 'calone', 'acuático'])
         );
       }
-      if (exclusionChoice === EXCLUSION_LABELS.woody) {
+      if (exclusionChoice === 'woody') {
         return (
           perfume.mainCategory === 'Amaderado / Oriental' ||
           hasAny(notesText, ['oud', 'cuero', 'incienso', 'madera', 'cedro', 'sándalo', 'pachulí', 'vetiver', 'tabaco', 'ámbar'])
@@ -318,19 +309,19 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
 
       // 7. Ocasión de uso.
       const occasionMap: Record<string, string[]> = {
-        'Ocasiones especiales': ['fiesta', 'cita', 'noche', 'seductor', 'especial', 'gala'],
-        'Oficina / Trabajo': ['oficina', 'trabajo', 'formal', 'discreto', 'limpio', 'ejecutivo'],
-        'Todo uso / Diario': ['diario', 'casual', 'versátil', 'día', 'todo uso'],
-        'Deportivo / Activo': ['deporte', 'activo', 'fresco', 'gimnasio', 'energía']
+        special: ['fiesta', 'cita', 'noche', 'seductor', 'especial', 'gala'],
+        office: ['oficina', 'trabajo', 'formal', 'discreto', 'limpio', 'ejecutivo'],
+        daily: ['diario', 'casual', 'versátil', 'día', 'todo uso'],
+        sport: ['deporte', 'activo', 'fresco', 'gimnasio', 'energía']
       };
       if (hasAny(metaText, occasionMap[finalOccasion] || [])) score += 65;
-      if (finalOccasion === 'Ocasiones especiales' && perfume.environment === 'Noche') score += 35;
-      if (finalOccasion === 'Oficina / Trabajo' && perfume.environment === 'Día') score += 25;
-      if (finalOccasion === 'Todo uso / Diario' && perfume.environment === 'Indistinto') score += 30;
+      if (finalOccasion === 'special' && perfume.environment === 'Noche') score += 35;
+      if (finalOccasion === 'office' && perfume.environment === 'Día') score += 25;
+      if (finalOccasion === 'daily' && perfume.environment === 'Indistinto') score += 30;
 
       // 8. Afinidad de edad.
       const ageMatch = n(perfume.ageRange).match(/(\d{1,2})\s*[-–]\s*(\d{1,2})/);
-      const userAge = ageRange.includes('46') ? 46 : parseInt(ageRange, 10);
+      const userAge = ageRange === '46+' ? 46 : parseInt(ageRange, 10);
       if (ageMatch && !Number.isNaN(userAge)) {
         const perfumeStart = parseInt(ageMatch[1], 10);
         const perfumeEnd = parseInt(ageMatch[2], 10);
@@ -445,9 +436,9 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
       // Ocasión (10)
       const occasionHit = hasAny(metaText, occasionMap[finalOccasion] || []);
       const occasionBonus =
-        (finalOccasion === 'Ocasiones especiales' && perfume.environment === 'Noche') ||
-        (finalOccasion === 'Oficina / Trabajo' && perfume.environment === 'Día') ||
-        (finalOccasion === 'Todo uso / Diario' && perfume.environment === 'Indistinto');
+        (finalOccasion === 'special' && perfume.environment === 'Noche') ||
+        (finalOccasion === 'office' && perfume.environment === 'Día') ||
+        (finalOccasion === 'daily' && perfume.environment === 'Indistinto');
       addDimension(10, occasionHit ? 1 : occasionBonus ? 0.7 : 0.4);
 
       // Edad (5)
@@ -515,9 +506,9 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
       <QuizResultCard
         winner={winner}
         matchPercent={winnerMatchPercent}
-        occasionAnswer={occasionChoice}
-        skinAnswer={skinType}
-        intensityAnswer={intensityChoice}
+        occasionAnswer={optionLabel(9, occasionChoice)}
+        skinAnswer={optionLabel(3, skinType)}
+        intensityAnswer={optionLabel(4, intensityChoice)}
         onSelectFragrance={onSelectFragrance}
         onRestartQuiz={restartQuiz}
         favorites={favorites}
@@ -595,24 +586,21 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                ¿A quién va dirigida la fragancia?
+                {question(0).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                Permite al algoritmo calibrar sugerencias para uso personal o para obsequiar a alguien especial.
+                {question(0).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {[
-                { title: 'Para mí', desc: 'Desea encontrar su nueva firma olfativa predilecta' },
-                { title: 'Para otra persona', desc: 'Busca sorprender a alguien especial con una fragancia inolvidable' }
-              ].map((opt) => (
+              {question(0).options.map((opt) => (
                 <button
-                  key={opt.title}
+                  key={opt.id}
                   type="button"
-                  onClick={() => handleSelectAnswer(0, opt.title)}
+                  onClick={() => handleSelectAnswer(0, opt.id)}
                   className={`p-6 rounded-2xl text-left border transition-all duration-300 ${
-                    targetUser === opt.title
+                    targetUser === opt.id
                       ? isLight
                         ? 'bg-amber-100/90 border-[#C9A84C] text-[#09090b] shadow-md ring-1 ring-[#C9A84C]'
                         : 'bg-[#C9A84C]/15 border-[#C9A84C] text-stone-100 shadow-xl shadow-[#C9A84C]/10 ring-1 ring-[#C9A84C]'
@@ -624,10 +612,10 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                   <div className="flex justify-between items-center mb-2">
                     <span className={`text-lg font-bold font-serif-luxury ${
                       isLight ? 'text-[#09090b]' : 'text-stone-100'
-                    }`}>{opt.title}</span>
+                    }`}>{opt.label}</span>
                     <ArrowRight className="w-4 h-4 text-[#C9A84C]" />
                   </div>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.desc}</p>
+                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.description}</p>
                 </button>
               ))}
             </div>
@@ -641,19 +629,15 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿Qué perfil o género de fragancia buscas para ti?' : '¿Qué perfil o género de fragancia busca la persona?'}
+                {isForMe ? question(1).title : question(1).titleForOther || question(1).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe ? 'Filtraremos de inmediato nuestro catálogo según tu preferencia.' : 'Filtraremos de inmediato nuestro catálogo según el perfil seleccionado.'}
+                {isForMe ? question(1).subtitle : question(1).subtitleForOther || question(1).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              {[
-                { id: 'Dama', label: 'Dama', codeRef: 'D-', desc: 'Elegancia femenina, florales radiantes, dulces y frutales chic' },
-                { id: 'Caballero', label: 'Caballero', codeRef: 'C-', desc: 'Varonil, maderas nobles, especias cálidas y acordes fougère' },
-                { id: 'Unisex / Sin preferencia', label: 'Unisex / Sin preferencia', codeRef: 'U-', desc: 'Composiciones modernas y versátiles sin distinción de género' }
-              ].map((opt) => (
+              {question(1).options.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
@@ -672,15 +656,17 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                     <span className={`text-lg font-bold font-serif-luxury ${
                       isLight ? 'text-[#09090b]' : 'text-stone-100'
                     }`}>{opt.label}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                      isLight
-                        ? 'bg-amber-100 text-[#926615] border-amber-300'
-                        : 'bg-stone-900 text-[#F0D080] border-stone-700'
-                    }`}>
-                      {opt.codeRef}
-                    </span>
+                    {opt.codeRef && (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                        isLight
+                          ? 'bg-amber-100 text-[#926615] border-amber-300'
+                          : 'bg-stone-900 text-[#F0D080] border-stone-700'
+                      }`}>
+                        {opt.codeRef}
+                      </span>
+                    )}
                   </div>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.desc}</p>
+                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.description}</p>
                 </button>
               ))}
             </div>
@@ -694,26 +680,21 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿En qué rango de edad te encuentras?' : '¿En qué rango de edad se encuentra la persona?'}
+                {isForMe ? question(2).title : question(2).titleForOther || question(2).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe ? 'Nos permite calibrar entre propuestas juveniles dinámicas o creaciones maduras y señoriales para ti.' : 'Ayuda a calibrar entre propuestas juveniles dinámicas o creaciones maduras y señoriales.'}
+                {isForMe ? question(2).subtitle : question(2).subtitleForOther || question(2).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-              {[
-                { range: '15–20 años', desc: 'Chispeante, fresco y juvenil' },
-                { range: '21–30 años', desc: 'Moderno, seductor y fiestero' },
-                { range: '31–45 años', desc: 'Sofisticado, ejecutivo y seguro' },
-                { range: '46 años o más', desc: 'Distinguido, aristocrático y clásico' }
-              ].map((opt) => (
+              {question(2).options.map((opt) => (
                 <button
-                  key={opt.range}
+                  key={opt.id}
                   type="button"
-                  onClick={() => handleSelectAnswer(2, opt.range)}
+                  onClick={() => handleSelectAnswer(2, opt.id)}
                   className={`p-5 rounded-2xl text-center border transition-all duration-300 ${
-                    ageRange === opt.range
+                    ageRange === opt.id
                       ? isLight
                         ? 'bg-amber-100/90 border-[#C9A84C] text-[#09090b] shadow-md ring-1 ring-[#C9A84C]'
                         : 'bg-[#C9A84C]/15 border-[#C9A84C] text-stone-100 shadow-xl shadow-[#C9A84C]/10 ring-1 ring-[#C9A84C]'
@@ -724,8 +705,8 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                 >
                   <p className={`font-serif-luxury font-bold text-base mb-1 ${
                     isLight ? 'text-[#09090b]' : 'text-stone-100'
-                  }`}>{opt.range}</p>
-                  <p className={`text-[11px] ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.desc}</p>
+                  }`}>{opt.label}</p>
+                  <p className={`text-[11px] ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.description}</p>
                 </button>
               ))}
             </div>
@@ -739,40 +720,15 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿Qué tipo de piel tienes?' : '¿Qué tipo de piel posee la persona?'}
+                {isForMe ? question(3).title : question(3).titleForOther || question(3).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe ? 'Tu química dérmica y nivel de hidratación influyen directamente en la fijación y duración de tu perfume.' : 'La química dérmica y el nivel de hidratación influyen directamente en la fijación y duración del perfume.'}
+                {isForMe ? question(3).subtitle : question(3).subtitleForOther || question(3).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {[
-                {
-                  id: 'Piel Seca',
-                  emoji: '🏜️',
-                  title: 'Piel Seca',
-                  desc: 'Absorbe el perfume rápido; recomendamos fórmulas con mayor fijación o acordes densos como ámbar, maderas nobles y vainilla.'
-                },
-                {
-                  id: 'Piel Mixta',
-                  emoji: '⚖️',
-                  title: 'Piel Mixta',
-                  desc: 'Zona T con mayor oleosidad; equilibrio óptimo para proyectar acordes aromáticos, especiados y notas intermedias.'
-                },
-                {
-                  id: 'Normal',
-                  emoji: '🌸',
-                  title: 'Piel Normal',
-                  desc: 'Equilibrio perfecto de pH e hidratación; proyecta fielmente cualquier composición olfativa de salida a fondo.'
-                },
-                {
-                  id: 'Piel Grasa',
-                  emoji: '✨',
-                  title: 'Piel Grasa',
-                  desc: 'Mayor oleosidad natural; intensifica y proyecta mucho más el perfume; las fragancias frescas y acuáticas duran horas prolongadas.'
-                }
-              ].map((item) => (
+              {question(3).options.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -788,12 +744,12 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xl">{item.emoji}</span>
+                    <span className="text-xl">{item.icon}</span>
                     <span className={`font-serif-luxury font-bold text-base ${
                       isLight ? 'text-[#09090b]' : 'text-stone-100'
-                    }`}>{item.title}</span>
+                    }`}>{item.label}</span>
                   </div>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{item.desc}</p>
+                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{item.description}</p>
                 </button>
               ))}
             </div>
@@ -807,34 +763,15 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿Qué nivel de intensidad o proyección prefieres?' : '¿Qué nivel de intensidad o proyección prefiere la persona?'}
+                {isForMe ? question(4).title : question(4).titleForOther || question(4).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe ? 'Define el radio de proyección y la huella sensorial que deseas dejar en tu entorno.' : 'Define el radio de proyección y la huella sensorial que dejará en el ambiente.'}
+                {isForMe ? question(4).subtitle : question(4).subtitleForOther || question(4).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              {[
-                {
-                  id: 'Suave / Fresca',
-                  icon: '🌿',
-                  label: 'Suave / Fresca',
-                  desc: 'Discreta, ligera, ideal para el día a día y cercanía sin saturar el espacio'
-                },
-                {
-                  id: 'Equilibrada',
-                  icon: '✨',
-                  label: 'Equilibrada',
-                  desc: 'Ni demasiado tenue ni abrumadora, altamente versátil y elegante en cualquier momento'
-                },
-                {
-                  id: 'Intensa',
-                  icon: '🔥',
-                  label: 'Intensa',
-                  desc: 'Proyección fuerte, gran estela duradera que deja huella inolvidable a su paso'
-                }
-              ].map((opt) => (
+              {question(4).options.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
@@ -855,7 +792,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                       isLight ? 'text-[#09090b]' : 'text-stone-100'
                     }`}>{opt.label}</span>
                   </div>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.desc}</p>
+                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.description}</p>
                 </button>
               ))}
             </div>
@@ -869,44 +806,19 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿Qué familia olfativa despierta mayor afinidad en ti?' : '¿Qué familia olfativa despierta mayor afinidad en la persona?'}
+                {isForMe ? question(5).title : question(5).titleForOther || question(5).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe ? 'Representa el pilar y carácter aromático predominante que más disfrutas.' : 'Representa el pilar y carácter aromático predominante de la fragancia.'}
+                {isForMe ? question(5).subtitle : question(5).subtitleForOther || question(5).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {[
-                {
-                  id: 'Floral' as MainCategory,
-                  icon: '🌸',
-                  title: 'Floral',
-                  desc: 'Rosas románticas, jazmín noble, peonía fresca y lavanda'
-                },
-                {
-                  id: 'Dulce / Acaramelado' as MainCategory,
-                  icon: '🍯',
-                  title: 'Dulce / Acaramelado',
-                  desc: 'Vainilla cremosa, caramelo, haba tonka y pralinés adictivos'
-                },
-                {
-                  id: 'Cítrico / Acuático' as MainCategory,
-                  icon: '🍋',
-                  title: 'Cítrico / Acuático',
-                  desc: 'Bergamota viva, limón siciliano, brisa marina y frescor revitalizante'
-                },
-                {
-                  id: 'Amaderado / Oriental' as MainCategory,
-                  icon: '🌲',
-                  title: 'Amaderado / Oriental',
-                  desc: 'Sándalo cremoso, oud árabe, ámbar gris, especias cálidas y cuero'
-                }
-              ].map((fam) => (
+              {question(5).options.map((fam) => (
                 <button
                   key={fam.id}
                   type="button"
-                  onClick={() => handleSelectAnswer(5, fam.id)}
+                  onClick={() => handleSelectAnswer(5, fam.id as MainCategory)}
                   className={`p-6 rounded-2xl text-left border transition-all duration-300 ${
                     familyChoice === fam.id
                       ? isLight
@@ -921,9 +833,9 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                     <span className="text-2xl">{fam.icon}</span>
                     <span className={`font-serif-luxury font-bold text-lg ${
                       isLight ? 'text-[#09090b]' : 'text-stone-100'
-                    }`}>{fam.title}</span>
+                    }`}>{fam.label}</span>
                   </div>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{fam.desc}</p>
+                  <p className={`text-xs leading-relaxed ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{fam.description}</p>
                 </button>
               ))}
             </div>
@@ -938,7 +850,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                 <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                   isLight ? 'text-[#09090b]' : 'text-stone-100'
                 }`}>
-                  {isForMe ? '¿Cuáles de estos acordes aromáticos prefieres o disfrutas más?' : '¿Cuáles de estos acordes aromáticos prefiere o disfruta más la persona?'}
+                  {isForMe ? question(6).title : question(6).titleForOther || question(6).title}
                 </h2>
                 <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
                   isLight
@@ -949,7 +861,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                 </span>
               </div>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                Aromas catalogados según la familia <span className={isLight ? 'text-[#926615] font-bold' : 'text-[#F0D080] font-semibold'}>{familyChoice}</span> (basados en la biblioteca olfativa oficial de Fraganza).
+                {question(6).subtitle} <span className={isLight ? 'text-[#926615] font-bold' : 'text-[#F0D080] font-semibold'}>{familyChoice}</span>
               </p>
 
               {/* Quick filter input */}
@@ -970,7 +882,7 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1 max-h-[50vh] overflow-y-auto pr-1">
-              {(EXPANDED_SUBFAMILIES_FOR_QUIZ[familyChoice] || [])
+              {(familySubfamilies || [])
                 .filter((sub) => {
                   if (!subfamilyFilter.trim()) return true;
                   return (
@@ -981,12 +893,12 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                   );
                 })
                 .map((sub) => {
-                  const selected = subFamilyChoices.includes(sub.label);
+                  const selected = subFamilyChoices.includes(sub.id);
                   return (
                     <button
                       key={sub.id}
                       type="button"
-                      onClick={() => handleToggleSubfamily(sub.label)}
+                      onClick={() => handleToggleSubfamily(sub.id)}
                       className={`p-4 rounded-2xl text-left border transition-all duration-200 flex flex-col justify-between space-y-2 group ${
                         selected
                           ? isLight
@@ -1083,54 +995,15 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿Qué buscas en un perfume?' : '¿Qué busca esa persona en un perfume?'}
+                {isForMe ? question(7).title : question(7).titleForOther || question(7).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe
-                  ? 'Elige el propósito, estilo y sensación que deseas proyectar para filtrar las opciones ideales de Fraganza.'
-                  : 'Define el estilo o la sensación que mejor encaja con sus momentos y personalidad.'}
+                {isForMe ? question(7).subtitle : question(7).subtitleForOther || question(7).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-              {[
-                {
-                  id: 'Inolvidable',
-                  icon: '✨',
-                  title: 'Que sea Inolvidable',
-                  desc: 'Estela magnética y memorable que despierte elogios y deje una huella única a donde vayas.'
-                },
-                {
-                  id: 'Agradable',
-                  icon: '😊',
-                  title: 'Que sea Agradable',
-                  desc: 'Equilibrado, acogedor y fácil de gustar a todos, ideal para causar una impresión positiva sin abrumar.'
-                },
-                {
-                  id: 'Versatil',
-                  icon: '🎯',
-                  title: 'Que sea Versátil',
-                  desc: 'Todo terreno infalible que combine armónicamente con cualquier atuendo, día, noche u ocasión casual.'
-                },
-                {
-                  id: 'Fresco y comodo',
-                  icon: '🍃',
-                  title: 'Que sea Fresco y Cómodo',
-                  desc: 'Sensación revitalizante, limpia y ligera como una brisa marina o cítrica, muy placentera de portar.'
-                },
-                {
-                  id: 'Fuerte',
-                  icon: '🔥',
-                  title: 'Que sea Fuerte',
-                  desc: 'Potente proyección, presencia marcada y duración descomunal que se haga notar con gran autoridad.'
-                },
-                {
-                  id: 'Suave',
-                  icon: '🕊️',
-                  title: 'Que sea Suave',
-                  desc: 'Aura íntima, sutil y discreta pegada a la piel, refinada y con elegancia sobria sin estridencias.'
-                }
-              ].map((opt) => (
+              {question(7).options.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
@@ -1152,13 +1025,13 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                         ? 'text-[#09090b] group-hover:text-[#926615]'
                         : 'text-stone-100 group-hover:text-[#F0D080]'
                     }`}>
-                      {opt.title}
+                      {opt.label}
                     </p>
                   </div>
                   <p className={`text-[11px] leading-relaxed ${
                     isLight ? 'text-stone-600' : 'text-stone-400'
                   }`}>
-                    {opt.desc}
+                    {opt.description}
                   </p>
                 </button>
               ))}
@@ -1173,30 +1046,21 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿Existe alguna faceta o aroma que prefieras evitar?' : '¿Existe alguna faceta o nota que esa persona prefiera evitar?'}
+                {isForMe ? question(8).title : question(8).titleForOther || question(8).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe
-                  ? 'Filtro para descartar acordes o intensidades que no sean de tu agrado.'
-                  : 'Filtro de exclusión negativa para descartar acordes o intensidades que le resulten incómodas.'}
+                {isForMe ? question(8).subtitle : question(8).subtitleForOther || question(8).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-              {[
-                { title: 'Muy dulce o empalagoso', desc: 'Descartar caramelo excesivo o praliné pesado' },
-                { title: 'Muy fuerte o abrumador', desc: 'Descartar estelas envolventes o intrusivas' },
-                { title: 'Muy floral', desc: 'Descartar buqués florales dominantes' },
-                { title: 'Muy cítrico', desc: 'Descartar cítricos punzantes o ácidos' },
-                { title: 'Muy amaderado u oscuro', desc: 'Descartar maderas densas, cuero u oud' },
-                { title: 'Estoy abierto/a a todo', desc: 'No excluir ninguna nota, evaluar todo el catálogo' }
-              ].map((opt) => (
+              {question(8).options.map((opt) => (
                 <button
-                  key={opt.title}
+                  key={opt.id}
                   type="button"
-                  onClick={() => handleSelectAnswer(8, opt.title)}
+                  onClick={() => handleSelectAnswer(8, opt.id)}
                   className={`p-5 rounded-2xl text-left border transition-all duration-300 ${
-                    exclusionChoice === opt.title
+                    exclusionChoice === opt.id
                       ? isLight
                         ? 'bg-amber-100/90 border-[#C9A84C] text-[#09090b] shadow-md ring-1 ring-[#C9A84C]'
                         : 'bg-[#C9A84C]/15 border-[#C9A84C] text-stone-100 shadow-xl shadow-[#C9A84C]/10 ring-1 ring-[#C9A84C]'
@@ -1207,8 +1071,8 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                 >
                   <p className={`font-serif-luxury font-bold text-sm mb-1 ${
                     isLight ? 'text-[#09090b]' : 'text-stone-100'
-                  }`}>{opt.title}</p>
-                  <p className={`text-[11px] ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.desc}</p>
+                  }`}>{opt.label}</p>
+                  <p className={`text-[11px] ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>{opt.description}</p>
                 </button>
               ))}
             </div>
@@ -1222,42 +1086,15 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
               <h2 className={`text-2xl md:text-3xl font-bold font-serif-luxury ${
                 isLight ? 'text-[#09090b]' : 'text-stone-100'
               }`}>
-                {isForMe ? '¿En qué ocasión o escenario usarás principalmente tu fragancia?' : '¿En qué ocasión o escenario usará principalmente la fragancia esa persona?'}
+                {isForMe ? question(9).title : question(9).titleForOther || question(9).title}
               </h2>
               <p className={`text-xs md:text-sm mt-1 ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
-                {isForMe
-                  ? 'Determinará el escenario de uso idóneo y el consejo personalizado del perfumista para ti.'
-                  : 'Determinará el escenario de uso idóneo y el consejo personalizado del perfumista.'}
+                {isForMe ? question(9).subtitle : question(9).subtitleForOther || question(9).subtitle}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {[
-                {
-                  id: 'Todo uso / Diario',
-                  icon: '🌅',
-                  title: 'Todo uso / Diario',
-                  desc: 'Para llevar siempre, cómoda y fresca en cualquier momento'
-                },
-                {
-                  id: 'Oficina / Trabajo',
-                  icon: '💼',
-                  title: 'Oficina / Trabajo',
-                  desc: 'Discreta, profesional y agradable en espacios cerrados'
-                },
-                {
-                  id: 'Ocasiones especiales',
-                  icon: '🌙',
-                  title: 'Ocasiones especiales',
-                  desc: 'Para citas, fiestas, salidas de noche o momentos especiales'
-                },
-                {
-                  id: 'Deportivo / Activo',
-                  icon: '🏃',
-                  title: 'Deportivo / Activo',
-                  desc: 'Fresca y energizante, perfecta durante el ejercicio o actividades al aire libre'
-                }
-              ].map((item) => (
+              {question(9).options.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -1276,11 +1113,11 @@ export const SmartQuiz: React.FC<SmartQuizProps> = ({
                     <span className="text-2xl">{item.icon}</span>
                     <span className={`font-serif-luxury font-bold text-lg ${
                       isLight ? 'text-[#09090b]' : 'text-stone-100'
-                    }`}>{item.title}</span>
+                    }`}>{item.label}</span>
                   </div>
                   <p className={`text-xs italic leading-relaxed ${
                     isLight ? 'text-stone-600' : 'text-stone-400'
-                  }`}>{item.desc}</p>
+                  }`}>{item.description}</p>
                 </button>
               ))}
             </div>

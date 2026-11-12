@@ -3,6 +3,7 @@ import { getSupabaseConfig, SUPABASE_SQL_SCHEMA, insertFragranceInSupabase } fro
 import { CATALOG, CatalogFragrance } from '../data/fraganzaCatalog';
 import { getPerfumeBottlePhoto } from '../data/fragranceVisuals';
 import { getCustomizedFragrance, saveAdminFragranceUpdate, getCustomizedCatalog } from '../services/catalogStore';
+import { AdminQuizEditor } from './AdminQuizEditor';
 import {
   Database,
   X,
@@ -22,6 +23,7 @@ import {
   Camera,
   Upload,
   Edit3,
+  ListChecks,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -34,7 +36,7 @@ export const SupabaseDrawer: React.FC<SupabaseDrawerProps> = ({ isOpen, onClose 
   const [copiedSchema, setCopiedSchema] = useState(false);
   const [copiedInsert, setCopiedInsert] = useState(false);
   const [copiedUpdate, setCopiedUpdate] = useState(false);
-  const [activeTab, setActiveTab] = useState<'edit_existing' | 'tutorial' | 'add_colonia' | 'schema' | 'architecture'>('edit_existing');
+  const [activeTab, setActiveTab] = useState<'edit_existing' | 'quiz_editor' | 'tutorial' | 'add_colonia' | 'schema' | 'architecture'>('edit_existing');
   const config = getSupabaseConfig();
 
   // State for Editing Existing Perfume (Identification, Photo & Notes)
@@ -305,6 +307,18 @@ WHERE code = '${selectedFragranceCode}';`;
           </button>
 
           <button
+            onClick={() => setActiveTab('quiz_editor')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'quiz_editor'
+                ? 'bg-[#C9A84C] text-stone-950 shadow-md'
+                : 'text-stone-400 hover:text-stone-200 bg-stone-900/60'
+            }`}
+          >
+            <ListChecks className="w-3.5 h-3.5" />
+            <span>Editar Test Inteligente</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('tutorial')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'tutorial'
@@ -352,6 +366,9 @@ WHERE code = '${selectedFragranceCode}';`;
             <span>Estructura de Tablas</span>
           </button>
         </div>
+
+        {/* TAB: EDITAR TEST INTELIGENTE (PREGUNTAS Y OPCIONES) */}
+        {activeTab === 'quiz_editor' && <AdminQuizEditor />}
 
         {/* TAB: COLOCAR FOTOS Y NOTAS (ADMINISTRADOR) */}
         {activeTab === 'edit_existing' && (

@@ -162,6 +162,7 @@ Deno.serve(async (req: Request) => {
     toNote?: string;
     description?: string;
     notes?: Array<{ name?: string; category?: string }>;
+    config?: unknown;
   };
   try {
     body = await req.json();
@@ -170,6 +171,40 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = typeof body?.action === 'string' ? body.action : 'update';
+
+  // ---------------------------------------------------------------------------
+  // Configuración del Test Inteligente (tabla `quiz_config`).
+  // ---------------------------------------------------------------------------
+  if (action === 'quiz_config_save') {
+    const quizConfig = body?.config;
+    if (!quizConfig || typeof quizConfig !== 'object' || Array.isArray(quizConfig)) {
+      return json({ error: 'invalid_config' }, 400);
+    }
+
+    const res = await fetch(`${supabaseUrl}/rest/v1/quiz_config?on_conflict=id`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=representation'
+      },
+      body: JSON.stringify({
+        id: 'default',
+        config: quizConfig,
+        updated_at: new Date().toISOString()
+      })
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+      return json(
+        { error: 'database_error', status: res.status, detail: text.slice(0, 400) },
+        502
+      );
+    }
+    return json({ ok: true, action: 'quiz_config_save' });
+  }
 
   // ---------------------------------------------------------------------------
   // Acciones sobre la tabla `notes` (categorías, notas nuevas, borrar/merge).

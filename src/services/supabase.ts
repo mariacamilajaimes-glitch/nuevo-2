@@ -1,4 +1,5 @@
 import { CatalogFragrance, CATALOG } from '../data/fraganzaCatalog';
+import { QuizConfig, normalizeQuizConfig } from '../data/quizConfig';
 import { getAdminToken } from './adminAuth';
 
 export interface SupabaseConfig {
@@ -393,6 +394,41 @@ export async function ensureNotesInSupabase(
 ): Promise<boolean> {
   if (notes.length === 0) return true;
   return callCatalogAdmin({ action: 'notes_ensure', notes });
+}
+
+// ---------------------------------------------------------------------------
+// Configuración del Test Inteligente (tabla `quiz_config`)
+// ---------------------------------------------------------------------------
+
+/** Lee la configuración pública del test. Devuelve null si no hay fila. */
+export async function fetchQuizConfigFromSupabase(): Promise<QuizConfig | null> {
+  const config = getSupabaseConfig();
+  if (!config.isConfigured) return null;
+
+  try {
+    const res = await fetch(
+      `${config.url}/rest/v1/quiz_config?id=eq.default&select=config`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const raw = Array.isArray(rows) ? rows[0]?.config : null;
+    if (!raw || typeof raw !== 'object') return null;
+    return normalizeQuizConfig(raw);
+  } catch (err) {
+    console.warn('Could not load quiz config from Supabase:', err);
+    return null;
+  }
+}
+
+/** Guarda la configuración del test (solo administrador autenticado). */
+export async function saveQuizConfigInSupabase(config: QuizConfig): Promise<boolean> {
+  return callCatalogAdmin({ action: 'quiz_config_save', config });
 }
 
 // ---------------------------------------------------------------------------

@@ -72,6 +72,10 @@ CREATE TABLE IF NOT EXISTS public.fragrances (
     personality VARCHAR(150),                                -- Rasgo distintivo de personalidad
     description TEXT,                                        -- Descripción corta y elegante
     image_url TEXT,                                          -- URL o ruta de la fotografía del frasco
+    sensation TEXT,                                          -- Sensación que transmite (editada desde el panel)
+    environment VARCHAR(50),                                 -- 'Día', 'Noche' o 'Indistinto'
+    main_accords JSONB DEFAULT '[]'::jsonb,                  -- Acordes visibles (editados desde el panel)
+    is_customized BOOLEAN NOT NULL DEFAULT false,            -- Marca las filas editadas desde el panel
     
     -- Arrays desnormalizados indexados con GIN para búsquedas combinadas instantáneas
     top_notes TEXT[] DEFAULT '{}'::text[] NOT NULL,          -- Notas de salida (primeros 15 min)
@@ -114,7 +118,16 @@ CREATE TABLE IF NOT EXISTS public.fragrance_notes (
 CREATE INDEX IF NOT EXISTS idx_fn_search ON public.fragrance_notes (note_id, position, fragrance_id);
 CREATE INDEX IF NOT EXISTS idx_fn_fragrance ON public.fragrance_notes (fragrance_id, position);
 
--- 6. VISTA COMPLETA DE DETALLE DE FRAGANCIAS
+-- 6. TABLA DE CONFIGURACIÓN DEL TEST INTELIGENTE
+-- Guarda las preguntas, opciones y acordes que se editan desde el panel admin.
+-- La fila `id='default'` es la que lee el test público.
+CREATE TABLE IF NOT EXISTS public.quiz_config (
+    id TEXT PRIMARY KEY,
+    config JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- 7. VISTA COMPLETA DE DETALLE DE FRAGANCIAS
 CREATE OR REPLACE VIEW public.v_fragrance_details AS
 SELECT 
     f.id,
@@ -245,11 +258,13 @@ $$;
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fragrances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fragrance_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_config ENABLE ROW LEVEL SECURITY;
 
 -- Acceso público de sólo lectura (cualquier visitante puede consultar perfumes y notas)
 CREATE POLICY "Public read notes" ON public.notes FOR SELECT USING (true);
 CREATE POLICY "Public read fragrances" ON public.fragrances FOR SELECT USING (true);
 CREATE POLICY "Public read fragrance_notes" ON public.fragrance_notes FOR SELECT USING (true);
+CREATE POLICY "Public read quiz_config" ON public.quiz_config FOR SELECT USING (true);
 
 -- Trigger para actualizar columna updated_at automáticamente
 CREATE OR REPLACE FUNCTION public.set_updated_at()
