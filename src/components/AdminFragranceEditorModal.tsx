@@ -57,14 +57,14 @@ const COMMON_FRAGRANTICA_ACCORDS = [
   'avainillado'
 ];
 
-export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps> = ({
-  fragrance,
-  isOpen,
-  onClose,
-  onSaved,
-}) => {
-  if (!isOpen || !fragrance) return null;
+export const AdminFragranceEditorModal: React.FC<AdminFragranceEditorModalProps> = (props) => {
+  if (!props.isOpen || !props.fragrance) return null;
+  return <AdminFragranceEditorModalContent {...props} fragrance={props.fragrance} />;
+};
 
+const AdminFragranceEditorModalContent: React.FC<
+  AdminFragranceEditorModalProps & { fragrance: CatalogFragrance }
+> = ({ fragrance, onClose, onSaved }) => {
   const overrides = getStoredOverrides();
   const currentOverride = overrides[fragrance.code] || overrides[fragrance.id] || {};
 

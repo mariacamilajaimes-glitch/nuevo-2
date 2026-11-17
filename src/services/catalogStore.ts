@@ -8,10 +8,15 @@ import {
   RemoteCustomizedRow,
   updateNoteCategoryInSupabase,
   upsertNoteInSupabase,
+  resetNoteInSupabase,
   deleteNoteInSupabase,
   mergeNoteInSupabase,
-  ensureNotesInSupabase
+  ensureNotesInSupabase,
+  fetchCustomizedNoteRows,
+  saveFamilyPhotoInSupabase,
+  fetchFamilyPhotosFromSupabase
 } from './supabase';
+import { hasAdminSession } from './adminAuth';
 
 export interface AccordItem {
   name: string;
@@ -443,10 +448,15 @@ export async function saveCustomNoteDetail(note: CustomNoteDetail): Promise<void
     window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { noteName: note.originalName } }));
 
     // Refleja la nota en Supabase para que el catálogo compartido quede al día.
+    // Se envían también foto y nombres para que la ficha completa se conserve
+    // y todos los visitantes vean lo mismo.
     upsertNoteInSupabase({
       name: note.originalName,
       category: note.category,
-      description: note.description
+      description: note.description,
+      photoUrl: optimizedUrl,
+      displayName: record.displayName,
+      botanicalName: record.botanicalName
     }).catch((err) => console.warn('Supabase note sync warning:', err));
   } catch (e) {
     console.error('Error saving custom note detail:', e);
@@ -464,6 +474,11 @@ export async function resetCustomNoteDetail(noteName: string): Promise<void> {
 
     writeLocalStorageSafe(CUSTOM_NOTES_KEY, inMemoryCustomNotes);
     writeLocalStorageSafe(NOTE_PHOTOS_KEY, inMemoryNotePhotos);
+
+    // Limpia también la ficha compartida (foto y nombres personalizados).
+    resetNoteInSupabase(noteName).catch((err) =>
+      console.warn('Supabase note reset warning:', err)
+    );
 
     window.dispatchEvent(new CustomEvent('fraganza_notes_updated', { detail: { noteName } }));
     window.dispatchEvent(new CustomEvent('fraganza_catalog_updated', { detail: { noteName } }));
@@ -652,8 +667,154 @@ export async function saveFamilyPhoto(familyId: string, photoUrl: string): Promi
     inMemoryFamilyPhotos[familyId] = finalPhoto;
     await idbSet(FAMILY_PHOTOS_KEY, inMemoryFamilyPhotos);
     writeLocalStorageSafe(FAMILY_PHOTOS_KEY, inMemoryFamilyPhotos);
+
+    // Comparte la foto con todos los visitantes.
+    saveFamilyPhotoInSupabase(familyId, finalPhoto).catch((err) =>
+      console.warn('Supabase family photo sync warning:', err)
+    );
+
     window.dispatchEvent(new CustomEvent('fraganza_family_photos_updated', { detail: { familyId, photoUrl: finalPhoto } }));
   } catch (e) {
     console.error('Error saving family photo:', e);
+  }
+}
+
+/**
+ * Trae desde Supabase las fichas de notas personalizadas (foto, nombre,
+ * categoría y descripción). Lo remoto manda, pero nunca se pierde un dato
+ * local que todavía no se haya compartido.
+ */
+export async function syncRemoteNoteDetails(): Promise<number> {
+  try {
+    const rows = await fetchCustomizedNoteRows();
+    const remoteKeys = new Set<string>();
+    let applied = 0;
+
+    for (const row of rows) {
+      if (!row || typeof row.name !== 'string' || !row.name.trim()) continue;
+      const key = row.name.toLowerCase().trim();
+      remoteKeys.add(key);
+
+      const remotePhoto = (row.photo_url || '').trim();
+      const remoteDisplay = (row.display_name || '').trim();
+      const remoteBotanical = (row.botanical_name || '').trim();
+      const remoteCategory = (row.category || '').trim();
+      const remoteDescription = (row.description || '').trim();
+      const existing = inMemoryCustomNotes[key];
+
+      if (
+        !remotePhoto &&
+        !remoteDisplay &&
+        !remoteBotanical &&
+        !remoteCategory &&
+        !remoteDescription &&
+        !existing
+      ) {
+        continue;
+      }
+
+      const record: CustomNoteDetail = {
+        originalName: existing?.originalName || row.name,
+        displayName: remoteDisplay || existing?.displayName || row.name,
+        botanicalName: remoteBotanical || existing?.botanicalName,
+        category: remoteCategory || existing?.category || 'Florales',
+        description:
+          remoteDescription ||
+          existing?.description ||
+          `Nota olfativa oficial: ${row.name}`,
+        photoUrl: remotePhoto || existing?.photoUrl || '',
+        updatedAt: new Date().toISOString()
+      };
+
+      inMemoryCustomNotes[key] = record;
+      if (record.photoUrl) inMemoryNotePhotos[key] = record.photoUrl;
+      applied++;
+    }
+
+    // Sube una sola vez las fichas que ya existían en este navegador y aún no
+    // estaban en Supabase (solo si hay sesión de administrador).
+    if (hasAdminSession()) {
+      const pending = Object.entries(inMemoryCustomNotes).filter(
+        ([key]) => !remoteKeys.has(key)
+      );
+      for (const [key, detail] of pending) {
+        if (!detail.photoUrl && !detail.botanicalName) continue;
+        try {
+          await upsertNoteInSupabase({
+            name: detail.originalName || key,
+            category: detail.category,
+            description: detail.description,
+            photoUrl: detail.photoUrl,
+            displayName: detail.displayName,
+            botanicalName: detail.botanicalName
+          });
+        } catch (err) {
+          console.warn('Could not push local note detail:', err);
+        }
+      }
+    }
+
+    if (applied > 0) {
+      await idbSet(CUSTOM_NOTES_KEY, inMemoryCustomNotes);
+      await idbSet(NOTE_PHOTOS_KEY, inMemoryNotePhotos);
+      writeLocalStorageSafe(CUSTOM_NOTES_KEY, inMemoryCustomNotes);
+      writeLocalStorageSafe(NOTE_PHOTOS_KEY, inMemoryNotePhotos);
+      window.dispatchEvent(
+        new CustomEvent('fraganza_notes_updated', { detail: { source: 'supabase_remote_sync' } })
+      );
+      window.dispatchEvent(
+        new CustomEvent('fraganza_catalog_updated', { detail: { source: 'supabase_remote_sync' } })
+      );
+    }
+
+    return applied;
+  } catch (e) {
+    console.warn('Error syncing remote note details:', e);
+    return 0;
+  }
+}
+
+/**
+ * Trae desde Supabase las fotos de las familias olfativas y comparte las que
+ * ya existían localmente (solo con sesión de administrador).
+ */
+export async function syncRemoteFamilyPhotos(): Promise<number> {
+  try {
+    const remote = await fetchFamilyPhotosFromSupabase();
+    const entries = Object.entries(remote);
+    let applied = 0;
+
+    for (const [familyId, photoUrl] of entries) {
+      if (!familyId || !photoUrl) continue;
+      inMemoryFamilyPhotos[familyId] = photoUrl;
+      applied++;
+    }
+
+    if (hasAdminSession()) {
+      const remoteIds = new Set(entries.map(([id]) => id));
+      const pending = Object.entries(inMemoryFamilyPhotos).filter(
+        ([familyId, photoUrl]) => photoUrl && !remoteIds.has(familyId)
+      );
+      for (const [familyId, photoUrl] of pending) {
+        try {
+          await saveFamilyPhotoInSupabase(familyId, photoUrl);
+        } catch (err) {
+          console.warn('Could not push local family photo:', err);
+        }
+      }
+    }
+
+    if (applied > 0) {
+      await idbSet(FAMILY_PHOTOS_KEY, inMemoryFamilyPhotos);
+      writeLocalStorageSafe(FAMILY_PHOTOS_KEY, inMemoryFamilyPhotos);
+      window.dispatchEvent(
+        new CustomEvent('fraganza_family_photos_updated', { detail: { source: 'supabase_remote_sync' } })
+      );
+    }
+
+    return applied;
+  } catch (e) {
+    console.warn('Error syncing remote family photos:', e);
+    return 0;
   }
 }

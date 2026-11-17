@@ -45,6 +45,11 @@ CREATE TABLE IF NOT EXISTS public.notes (
     slug VARCHAR(120) NOT NULL UNIQUE,
     category VARCHAR(60) NOT NULL DEFAULT 'Aromática',
     description TEXT,
+    photo_url TEXT,
+    display_name VARCHAR(150),
+    botanical_name VARCHAR(150),
+    is_customized BOOLEAN NOT NULL DEFAULT false,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -52,6 +57,14 @@ CREATE TABLE IF NOT EXISTS public.notes (
 CREATE INDEX IF NOT EXISTS idx_notes_name_trgm ON public.notes USING gin (name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_notes_category ON public.notes (category);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_name_lower ON public.notes (LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_notes_customized ON public.notes (is_customized) WHERE is_customized = true;
+
+-- 3b. TABLA: FAMILY_PHOTOS (Fotos editables de las familias olfativas)
+CREATE TABLE IF NOT EXISTS public.family_photos (
+    family_id TEXT PRIMARY KEY,
+    photo_url TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
 
 -- 4. TABLA: FRAGRANCES (Catálogo principal de fragancias)
 CREATE TABLE IF NOT EXISTS public.fragrances (
@@ -259,12 +272,14 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fragrances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fragrance_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.family_photos ENABLE ROW LEVEL SECURITY;
 
 -- Acceso público de sólo lectura (cualquier visitante puede consultar perfumes y notas)
 CREATE POLICY "Public read notes" ON public.notes FOR SELECT USING (true);
 CREATE POLICY "Public read fragrances" ON public.fragrances FOR SELECT USING (true);
 CREATE POLICY "Public read fragrance_notes" ON public.fragrance_notes FOR SELECT USING (true);
 CREATE POLICY "Public read quiz_config" ON public.quiz_config FOR SELECT USING (true);
+CREATE POLICY "Public read family_photos" ON public.family_photos FOR SELECT USING (true);
 
 -- Trigger para actualizar columna updated_at automáticamente
 CREATE OR REPLACE FUNCTION public.set_updated_at()

@@ -42,14 +42,14 @@ const NOTE_CATEGORIES = [
   'Almizcle, Ámbar, Aromas Animálicos',
 ];
 
-export const AdminNotePhotoEditorModal: React.FC<AdminNotePhotoEditorModalProps> = ({
-  noteName,
-  isOpen,
-  onClose,
-  onSaved,
-}) => {
-  if (!isOpen || !noteName) return null;
+export const AdminNotePhotoEditorModal: React.FC<AdminNotePhotoEditorModalProps> = (props) => {
+  if (!props.isOpen || !props.noteName) return null;
+  return <AdminNotePhotoEditorModalContent {...props} noteName={props.noteName} />;
+};
 
+const AdminNotePhotoEditorModalContent: React.FC<
+  AdminNotePhotoEditorModalProps & { noteName: string }
+> = ({ noteName, isOpen, onClose, onSaved }) => {
   const currentVisual = getRealNotePhoto(noteName);
   const existingCustom = getStoredCustomNote(noteName);
 

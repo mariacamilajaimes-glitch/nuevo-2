@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CatalogFragrance, CATALOG } from './data/fraganzaCatalog';
-import { getCustomizedCatalog, syncRemoteCatalogOverrides } from './services/catalogStore';
+import { getCustomizedCatalog, syncRemoteCatalogOverrides, syncRemoteNoteDetails, syncRemoteFamilyPhotos } from './services/catalogStore';
 import { SmartQuiz } from './components/SmartQuiz';
 import { AdvancedSearch } from './components/AdvancedSearch';
 import { FamilyExplorer } from './components/FamilyExplorer';
@@ -211,6 +211,13 @@ export default function App() {
   useEffect(() => {
     syncRemoteCatalogOverrides();
   }, []);
+
+  // Fichas de notas y fotos de familias: se comparten con todos. Al iniciar
+  // sesión de administrador también se suben las que ya existían en local.
+  useEffect(() => {
+    syncRemoteNoteDetails();
+    syncRemoteFamilyPhotos();
+  }, [isAdmin]);
 
   const savedFragrances = catalogList.filter((f) => favorites.includes(f.id));
 

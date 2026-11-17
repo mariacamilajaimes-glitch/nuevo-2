@@ -68,12 +68,25 @@ CREATE TABLE IF NOT EXISTS public.notes (
     slug VARCHAR(120) NOT NULL UNIQUE,
     category VARCHAR(60) NOT NULL DEFAULT 'Aromática',
     description TEXT,
+    photo_url TEXT,
+    display_name VARCHAR(150),
+    botanical_name VARCHAR(150),
+    is_customized BOOLEAN NOT NULL DEFAULT false,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_name_trgm ON public.notes USING gin (name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_notes_category ON public.notes (category);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_name_lower ON public.notes (LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_notes_customized ON public.notes (is_customized) WHERE is_customized = true;
+
+-- 3b. TABLA: FAMILY_PHOTOS (fotos editables de las familias olfativas)
+CREATE TABLE IF NOT EXISTS public.family_photos (
+    family_id TEXT PRIMARY KEY,
+    photo_url TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
 
 -- 4. TABLA: FRAGRANCES (Catálogo principal de fragancias)
 CREATE TABLE IF NOT EXISTS public.fragrances (
@@ -139,10 +152,12 @@ CREATE INDEX IF NOT EXISTS idx_fn_fragrance ON public.fragrance_notes (fragrance
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fragrances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fragrance_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.family_photos ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public read notes" ON public.notes FOR SELECT USING (true);
 CREATE POLICY "Public read fragrances" ON public.fragrances FOR SELECT USING (true);
 CREATE POLICY "Public read fragrance_notes" ON public.fragrance_notes FOR SELECT USING (true);
+CREATE POLICY "Public read family_photos" ON public.family_photos FOR SELECT USING (true);
 `;
 
 // Helper to fetch or fallback
@@ -369,13 +384,24 @@ export async function upsertNoteInSupabase(note: {
   name: string;
   category: string;
   description?: string;
+  photoUrl?: string;
+  displayName?: string;
+  botanicalName?: string;
 }): Promise<boolean> {
   return callCatalogAdmin({
     action: 'note_upsert',
     noteName: note.name,
     newCategory: note.category,
-    description: note.description
+    description: note.description,
+    photoUrl: note.photoUrl,
+    displayName: note.displayName,
+    botanicalName: note.botanicalName
   });
+}
+
+/** Restablece la ficha personalizada de una nota (foto y nombres). */
+export async function resetNoteInSupabase(noteName: string): Promise<boolean> {
+  return callCatalogAdmin({ action: 'note_reset', noteName });
 }
 
 /** Elimina una nota del catálogo canónico. */
@@ -394,6 +420,98 @@ export async function ensureNotesInSupabase(
 ): Promise<boolean> {
   if (notes.length === 0) return true;
   return callCatalogAdmin({ action: 'notes_ensure', notes });
+}
+
+// ---------------------------------------------------------------------------
+// Lectura de las fichas de notas personalizadas (foto, nombres, categoría).
+// ---------------------------------------------------------------------------
+
+export interface RemoteCustomizedNoteRow {
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  photo_url?: string | null;
+  display_name?: string | null;
+  botanical_name?: string | null;
+}
+
+export async function fetchCustomizedNoteRows(): Promise<RemoteCustomizedNoteRow[]> {
+  const config = getSupabaseConfig();
+  if (!config.isConfigured) return [];
+
+  try {
+    const fields = [
+      'name',
+      'category',
+      'description',
+      'photo_url',
+      'display_name',
+      'botanical_name'
+    ].join(',');
+
+    const res = await fetch(
+      `${config.url}/rest/v1/notes?is_customized=eq.true&select=${fields}`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.warn('Could not load customized note rows from Supabase:', err);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fotos de las familias olfativas (tabla `family_photos`).
+// ---------------------------------------------------------------------------
+
+export async function saveFamilyPhotoInSupabase(
+  familyId: string,
+  photoUrl: string
+): Promise<boolean> {
+  return callCatalogAdmin({ action: 'family_photo_save', familyId, photoUrl });
+}
+
+export async function resetFamilyPhotoInSupabase(familyId: string): Promise<boolean> {
+  return callCatalogAdmin({ action: 'family_photo_reset', familyId });
+}
+
+export async function fetchFamilyPhotosFromSupabase(): Promise<Record<string, string>> {
+  const config = getSupabaseConfig();
+  if (!config.isConfigured) return {};
+
+  try {
+    const res = await fetch(
+      `${config.url}/rest/v1/family_photos?select=family_id,photo_url`,
+      {
+        headers: {
+          apikey: config.anonKey,
+          Authorization: `Bearer ${config.anonKey}`
+        }
+      }
+    );
+    if (!res.ok) return {};
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return {};
+
+    const photos: Record<string, string> = {};
+    for (const row of rows) {
+      if (row && typeof row.family_id === 'string' && typeof row.photo_url === 'string') {
+        photos[row.family_id] = row.photo_url;
+      }
+    }
+    return photos;
+  } catch (err) {
+    console.warn('Could not load family photos from Supabase:', err);
+    return {};
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -161,6 +161,10 @@ Deno.serve(async (req: Request) => {
     newCategory?: string;
     toNote?: string;
     description?: string;
+    photoUrl?: string;
+    displayName?: string;
+    botanicalName?: string;
+    familyId?: string;
     notes?: Array<{ name?: string; category?: string }>;
     config?: unknown;
   };
@@ -222,7 +226,7 @@ Deno.serve(async (req: Request) => {
 
     const findNote = async (name: string) => {
       const res = await fetch(
-        `${notesUrl}?name=eq.${encodeURIComponent(name)}&select=id,name,slug,category`,
+        `${notesUrl}?name=eq.${encodeURIComponent(name)}&select=id,name,slug,category,description,photo_url,display_name,botanical_name,is_customized`,
         { headers: authHeaders }
       );
       if (!res.ok) return null;
@@ -235,11 +239,21 @@ Deno.serve(async (req: Request) => {
         ? body.newCategory.trim()
         : 'Aromática';
       const description = typeof body?.description === 'string' ? body.description : undefined;
+      const photoUrl = typeof body?.photoUrl === 'string' ? body.photoUrl.trim() : undefined;
+      const displayName = typeof body?.displayName === 'string' ? body.displayName.trim() : undefined;
+      const botanicalName = typeof body?.botanicalName === 'string' ? body.botanicalName.trim() : undefined;
+      const now = new Date().toISOString();
 
       const existing = await findNote(noteName);
       if (existing) {
-        const patch: Record<string, unknown> = { category };
+        const patch: Record<string, unknown> = { category, updated_at: now };
         if (description !== undefined) patch.description = description;
+        // Nunca se borra una foto o un nombre ya guardado por enviar un campo vacío.
+        // Para limpiar la ficha se usa `note_reset`.
+        if (photoUrl) patch.photo_url = photoUrl;
+        if (displayName) patch.display_name = displayName;
+        if (botanicalName) patch.botanical_name = botanicalName;
+        if (action === 'note_upsert') patch.is_customized = true;
         const res = await fetch(`${notesUrl}?id=eq.${existing.id}`, {
           method: 'PATCH',
           headers: { ...authHeaders, Prefer: 'return=representation' },
@@ -258,13 +272,39 @@ Deno.serve(async (req: Request) => {
           name: noteName,
           slug: slugify(noteName),
           category,
-          description: description ?? `Nota olfativa: ${noteName}`
+          description: description ?? `Nota olfativa: ${noteName}`,
+          photo_url: photoUrl || null,
+          display_name: displayName || noteName,
+          botanical_name: botanicalName || null,
+          is_customized: action === 'note_upsert',
+          updated_at: now
         })
       });
       if (!res.ok) {
         return json({ error: 'database_error', detail: (await res.text()).slice(0, 400) }, 502);
       }
       return json({ ok: true, action, noteName, created: true });
+    }
+
+    if (action === 'note_reset') {
+      const existing = await findNote(noteName);
+      if (!existing) return json({ ok: true, action, noteName, reset: false });
+
+      const res = await fetch(`${notesUrl}?id=eq.${existing.id}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({
+          photo_url: null,
+          display_name: null,
+          botanical_name: null,
+          is_customized: false,
+          updated_at: new Date().toISOString()
+        })
+      });
+      if (!res.ok) {
+        return json({ error: 'database_error', detail: (await res.text()).slice(0, 400) }, 502);
+      }
+      return json({ ok: true, action, noteName, reset: true });
     }
 
     if (action === 'note_delete') {
@@ -361,6 +401,52 @@ Deno.serve(async (req: Request) => {
     }
 
     return json({ error: 'unknown_note_action', action }, 400);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fotos de las familias olfativas (tabla `family_photos`).
+  // ---------------------------------------------------------------------------
+  if (action === 'family_photo_save' || action === 'family_photo_reset') {
+    const familyId = typeof body?.familyId === 'string' ? body.familyId.trim() : '';
+    if (!familyId) return json({ error: 'missing_family_id' }, 400);
+
+    const familyUrl = `${supabaseUrl}/rest/v1/family_photos`;
+    const familyHeaders = {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json'
+    };
+
+    if (action === 'family_photo_reset') {
+      const res = await fetch(
+        `${familyUrl}?family_id=eq.${encodeURIComponent(familyId)}`,
+        { method: 'DELETE', headers: familyHeaders }
+      );
+      if (!res.ok) {
+        return json({ error: 'database_error', detail: (await res.text()).slice(0, 400) }, 502);
+      }
+      return json({ ok: true, action, familyId });
+    }
+
+    const photoUrl = typeof body?.photoUrl === 'string' ? body.photoUrl.trim() : '';
+    if (!photoUrl) return json({ error: 'missing_photo_url' }, 400);
+
+    const res = await fetch(`${familyUrl}?on_conflict=family_id`, {
+      method: 'POST',
+      headers: {
+        ...familyHeaders,
+        Prefer: 'resolution=merge-duplicates,return=representation'
+      },
+      body: JSON.stringify({
+        family_id: familyId,
+        photo_url: photoUrl,
+        updated_at: new Date().toISOString()
+      })
+    });
+    if (!res.ok) {
+      return json({ error: 'database_error', detail: (await res.text()).slice(0, 400) }, 502);
+    }
+    return json({ ok: true, action, familyId });
   }
 
   const code = typeof body?.code === 'string' ? body.code.trim() : '';
